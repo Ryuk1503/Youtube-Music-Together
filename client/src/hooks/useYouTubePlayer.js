@@ -6,6 +6,8 @@ export default function useYouTubePlayer() {
   const playerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const onEndedRef = useRef(null);
+  const onPlayingRef = useRef(null);
+  const onPausedRef = useRef(null);
 
   useEffect(() => {
     let destroyed = false;
@@ -47,8 +49,11 @@ export default function useYouTubePlayer() {
             setReady(true);
           },
           onStateChange: (event) => {
-            console.log('YT state:', event.data);
-            if (event.data === window.YT.PlayerState.ENDED) {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              onPlayingRef.current?.();
+            } else if (event.data === window.YT.PlayerState.PAUSED) {
+              onPausedRef.current?.();
+            } else if (event.data === window.YT.PlayerState.ENDED) {
               onEndedRef.current?.();
             }
           },
@@ -125,6 +130,8 @@ export default function useYouTubePlayer() {
     getCurrentTime,
     getDuration,
     onEndedRef,
+    onPlayingRef,
+    onPausedRef,
     CONTAINER_ID,
   };
 }

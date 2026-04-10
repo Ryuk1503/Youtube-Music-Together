@@ -91,12 +91,15 @@ export default function RoomPage() {
     return () => clearInterval(interval);
   }, [yt.ready, yt.getCurrentTime, yt.getDuration]);
 
-  // Handle song ended
+  // Sync isPlaying state from YouTube player state changes
   useEffect(() => {
+    yt.onPlayingRef.current = () => setIsPlaying(true);
+    yt.onPausedRef.current = () => setIsPlaying(false);
     yt.onEndedRef.current = () => {
+      setIsPlaying(false);
       if (isHost && socket) socket.emit('player:ended');
     };
-  }, [isHost, socket, yt.onEndedRef]);
+  }, [isHost, socket, yt.onPlayingRef, yt.onPausedRef, yt.onEndedRef]);
 
   // Socket event listeners
   useEffect(() => {
