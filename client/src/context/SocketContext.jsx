@@ -18,7 +18,9 @@ export function SocketProvider({ children }) {
     }
 
     const token = localStorage.getItem('token');
-    const newSocket = io('http://localhost:3001', {
+    // In production, connect to same host; in dev, connect to localhost:3001
+    const socketUrl = import.meta.env.PROD ? window.location.origin : 'http://localhost:3001';
+    const newSocket = io(socketUrl, {
       auth: { token },
     });
 
