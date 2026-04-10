@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import api from '../api';
 import Player from '../components/Player';
 import SearchPanel from '../components/SearchPanel';
 import Queue from '../components/Queue';
@@ -68,7 +69,7 @@ export default function RoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // Load audio when current song changes (proxy through server)
+  // Fetch audio URL from Piped API then load into audio element
   useEffect(() => {
     if (!currentSong) {
       setSongLoading(false);
@@ -78,26 +79,40 @@ export default function RoomPage() {
     const audio = audioRef.current;
     if (!audio) return;
 
+    let cancelled = false;
     setSongLoading(true);
     setCurrentTime(0);
     setDuration(0);
     audio.pause();
 
-    // Use server proxy endpoint — avoids YouTube IP-lock
-    audio.src = `/api/youtube/stream/${currentSong.videoId}`;
-    audio.volume = volume;
-    audio.load();
+    const loadAudio = async () => {
+      try {
+        const res = await api.get(`/youtube/audio/${currentSong.videoId}`);
+        if (cancelled) return;
 
-    const onCanPlay = () => {
-      setSongLoading(false);
-      setDuration(audio.duration || 0);
-      if (isPlaying) {
-        audio.play().catch(() => {});
+        audio.src = res.data.audioUrl;
+        audio.volume = volume;
+        audio.load();
+
+        const onCanPlay = () => {
+          if (cancelled) return;
+          setSongLoading(false);
+          setDuration(audio.duration || 0);
+          if (isPlaying) {
+            audio.play().catch(() => {});
+          }
+        };
+
+        audio.addEventListener('canplay', onCanPlay, { once: true });
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Failed to get audio URL:', err);
+        setSongLoading(false);
       }
     };
 
-    audio.addEventListener('canplay', onCanPlay, { once: true });
-    return () => audio.removeEventListener('canplay', onCanPlay);
+    loadAudio();
+    return () => { cancelled = true; };
   }, [currentSong?.videoId]);
 
   // Socket event listeners

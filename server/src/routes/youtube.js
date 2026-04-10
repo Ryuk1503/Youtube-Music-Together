@@ -1,42 +1,62 @@
 const express = require('express');
-const https = require('https');
 const ytsr = require('ytsr');
-const youtubedl = require('youtube-dl-exec');
 
 const router = express.Router();
 
-// Cache audio URLs (they expire after ~1 hour)
+// Cache audio URLs (30 min)
 const audioCache = new Map();
 
-// Helper: resolve audio URL (cached or fresh via yt-dlp)
-async function resolveAudioUrl(videoId) {
+// Piped API instances (free, proxy YouTube audio)
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.r4fo.com',
+];
+
+// Helper: get audio info from Piped API with fallback instances
+async function getAudioFromPiped(videoId) {
   const cached = audioCache.get(videoId);
-  if (cached && Date.now() - cached.timestamp < 3600000) {
-    return cached.audioUrl;
+  if (cached && Date.now() - cached.timestamp < 1800000) {
+    return cached.data;
   }
 
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, {
-    dumpSingleJson: true,
-    noCheckCertificates: true,
-    noWarnings: true,
-  });
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
 
-  const audioFormats = (info.formats || [])
-    .filter((f) => f.acodec !== 'none' && f.vcodec === 'none')
-    .sort((a, b) => (b.abr || 0) - (a.abr || 0));
+      const response = await fetch(`${instance}/streams/${videoId}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
 
-  const bestAudio = audioFormats[0] ||
-    (info.formats || [])
-      .filter((f) => f.acodec !== 'none' && f.url)
-      .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
+      if (!response.ok) continue;
+      const data = await response.json();
 
-  if (!bestAudio || !bestAudio.url) {
-    throw new Error('No audio format found');
+      const audioStreams = (data.audioStreams || [])
+        .filter((s) => s.mimeType?.startsWith('audio/'))
+        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+
+      if (audioStreams.length === 0) continue;
+
+      const result = {
+        audioUrl: audioStreams[0].url,
+        title: data.title || '',
+        thumbnail: data.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        duration: data.duration || 0,
+        author: data.uploader || 'Unknown',
+      };
+
+      audioCache.set(videoId, { data: result, timestamp: Date.now() });
+      console.log(`✅ Audio resolved via ${instance} for ${videoId}`);
+      return result;
+    } catch (err) {
+      console.warn(`⚠️ Piped instance ${instance} failed:`, err.message);
+      continue;
+    }
   }
 
-  audioCache.set(videoId, { audioUrl: bestAudio.url, timestamp: Date.now() });
-  return bestAudio.url;
+  throw new Error('All Piped instances failed');
 }
 
 // GET /api/youtube/search?q=query
@@ -69,61 +89,15 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// GET /api/youtube/stream/:videoId - Proxy audio stream through server
-// This avoids YouTube's IP-lock on direct audio URLs
-router.get('/stream/:videoId', async (req, res) => {
+// GET /api/youtube/audio/:videoId - Get audio URL via Piped API
+router.get('/audio/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
-    const audioUrl = await resolveAudioUrl(videoId);
-
-    // Build headers to forward (Range for seeking)
-    const proxyHeaders = {
-      'User-Agent': 'Mozilla/5.0',
-    };
-    if (req.headers.range) {
-      proxyHeaders['Range'] = req.headers.range;
-    }
-
-    const proxyReq = https.get(audioUrl, { headers: proxyHeaders }, (proxyRes) => {
-      // If YouTube returns a redirect, follow it
-      if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
-        https.get(proxyRes.headers.location, { headers: proxyHeaders }, (redirectRes) => {
-          pipeAudioResponse(redirectRes, res);
-        }).on('error', handleProxyError);
-        return;
-      }
-      pipeAudioResponse(proxyRes, res);
-    });
-
-    proxyReq.on('error', handleProxyError);
-
-    function pipeAudioResponse(proxyRes, res) {
-      res.status(proxyRes.statusCode);
-      const forward = ['content-type', 'content-length', 'content-range', 'accept-ranges'];
-      for (const h of forward) {
-        if (proxyRes.headers[h]) res.setHeader(h, proxyRes.headers[h]);
-      }
-      // Allow browser to cache for 10 min
-      res.setHeader('Cache-Control', 'public, max-age=600');
-      proxyRes.pipe(res);
-    }
-
-    function handleProxyError(err) {
-      console.error('Proxy stream error:', err.message);
-      // Clear cached URL in case it expired
-      audioCache.delete(videoId);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to stream audio' });
-      }
-    }
-
-    // If client disconnects, abort the proxy request
-    req.on('close', () => proxyReq.destroy());
+    const data = await getAudioFromPiped(videoId);
+    res.json(data);
   } catch (err) {
-    console.error('Stream error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to stream audio' });
-    }
+    console.error('Audio extraction error:', err.message);
+    res.status(500).json({ error: 'Failed to get audio URL' });
   }
 });
 
