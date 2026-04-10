@@ -44,10 +44,7 @@ export default function useYouTubePlayer() {
           origin: window.location.origin,
         },
         events: {
-          onReady: () => {
-            console.log('✅ YouTube player ready');
-            setReady(true);
-          },
+          onReady: () => setReady(true),
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
               onPlayingRef.current?.();
@@ -84,16 +81,16 @@ export default function useYouTubePlayer() {
   }, []);
 
   const loadVideo = useCallback((videoId, startSeconds = 0) => {
-    if (playerRef.current && ready) {
+    if (playerRef.current?.loadVideoById) {
       playerRef.current.loadVideoById({ videoId, startSeconds });
     }
-  }, [ready]);
+  }, []);
 
   const cueVideo = useCallback((videoId) => {
-    if (playerRef.current && ready) {
+    if (playerRef.current?.cueVideoById) {
       playerRef.current.cueVideoById(videoId);
     }
-  }, [ready]);
+  }, []);
 
   const play = useCallback(() => {
     playerRef.current?.playVideo?.();

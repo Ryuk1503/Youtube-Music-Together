@@ -73,12 +73,11 @@ export default function RoomPage() {
   // Load video into YouTube player when song changes
   useEffect(() => {
     if (!currentSong || !yt.ready) return;
-    console.log('Loading video:', currentSong.videoId);
     setCurrentTime(0);
     setDuration(0);
     yt.loadVideo(currentSong.videoId);
     yt.setVolume(volume);
-  }, [currentSong?.videoId, yt.ready]);
+  }, [currentSong?.videoId, currentIndex, yt.ready]);
 
   // Time tracking from YouTube player
   useEffect(() => {
@@ -144,6 +143,11 @@ export default function RoomPage() {
       setCurrentSong(playbackState.currentSong);
       setIsPlaying(playbackState.isPlaying);
       setCurrentTime(playbackState.currentTime);
+      // Directly load video for reliability (don't rely solely on effect)
+      if (playbackState.currentSong) {
+        yt.loadVideo(playbackState.currentSong.videoId);
+        yt.setVolume(volume);
+      }
     };
 
     const onQueueUpdated = ({ queue: q, currentIndex: ci }) => {
