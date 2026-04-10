@@ -99,17 +99,29 @@ export default function RoomPage() {
 
   // Sync isPlaying state from YouTube player state changes
   useEffect(() => {
-    yt.onPlayingRef.current = () => setIsPlaying(true);
-    yt.onPausedRef.current = () => setIsPlaying(false);
+    yt.onPlayingRef.current = () => {
+      setIsPlaying(true);
+      // Host: sync actual playback state to server (covers auto-play from loadVideoById)
+      if (isHost && socket) {
+        const ct = yt.getCurrentTime();
+        socket.emit('player:play', { currentTime: ct });
+      }
+    };
+    yt.onPausedRef.current = () => {
+      setIsPlaying(false);
+      if (isHost && socket) {
+        const ct = yt.getCurrentTime();
+        socket.emit('player:pause', { currentTime: ct });
+      }
+    };
     yt.onEndedRef.current = () => {
       setIsPlaying(false);
       if (isHost && socket) socket.emit('player:ended');
     };
     yt.onErrorRef.current = (errorCode) => {
-      // Error codes 100, 101, 150 = video not found or embedding disabled
       if (isHost && socket) socket.emit('player:errorSkip');
     };
-  }, [isHost, socket, yt.onPlayingRef, yt.onPausedRef, yt.onEndedRef, yt.onErrorRef]);
+  }, [isHost, socket, yt.onPlayingRef, yt.onPausedRef, yt.onEndedRef, yt.onErrorRef, yt]);
 
   // Socket event listeners
   useEffect(() => {
@@ -215,18 +227,14 @@ export default function RoomPage() {
   // Host controls
   const handlePlay = useCallback(() => {
     if (!isHost || !socket) return;
-    const ct = yt.getCurrentTime();
     yt.play();
-    setIsPlaying(true);
-    socket.emit('player:play', { currentTime: ct });
+    // Server sync handled by onPlayingRef callback
   }, [isHost, socket, yt]);
 
   const handlePause = useCallback(() => {
     if (!isHost || !socket) return;
-    const ct = yt.getCurrentTime();
     yt.pause();
-    setIsPlaying(false);
-    socket.emit('player:pause', { currentTime: ct });
+    // Server sync handled by onPausedRef callback
   }, [isHost, socket, yt]);
 
   const handleSeek = useCallback(
