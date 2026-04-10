@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -34,6 +34,7 @@ export default function RoomPage() {
   const [repeat, setRepeat] = useState(false);
   const [restricted, setRestricted] = useState([]);
   const [mobileTab, setMobileTab] = useState('player'); // 'player' | 'queue' | 'members'
+  const pendingSeekRef = useRef(0); // for syncing playback position on join
 
   // Join room on mount
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function RoomPage() {
         setIsPlaying(res.playbackState.isPlaying);
         setCurrentTime(res.playbackState.currentTime);
         setRepeat(res.playbackState.repeat || false);
+        pendingSeekRef.current = res.playbackState.currentTime || 0;
       }
 
       setLoading(false);
@@ -76,9 +78,10 @@ export default function RoomPage() {
   // Load video into YouTube player when song changes
   useEffect(() => {
     if (!currentSong || !yt.ready) return;
-    setCurrentTime(0);
+    const startAt = pendingSeekRef.current || 0;
+    pendingSeekRef.current = 0;
     setDuration(0);
-    yt.loadVideo(currentSong.videoId);
+    yt.loadVideo(currentSong.videoId, startAt);
     yt.setVolume(volume);
   }, [currentSong?.videoId, currentIndex, yt.ready]);
 
