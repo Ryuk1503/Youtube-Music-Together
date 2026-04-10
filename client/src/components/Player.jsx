@@ -2,6 +2,7 @@ import {
   Play,
   Pause,
   SkipForward,
+  Repeat,
   Volume2,
   VolumeX,
   Music,
@@ -21,11 +22,13 @@ export default function Player({
   duration,
   volume,
   isHost,
+  repeat,
   onPlay,
   onPause,
   onSeek,
   onNext,
   onVolumeChange,
+  onToggleRepeat,
   ytContainerId,
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -121,6 +124,20 @@ export default function Player({
             className="w-9 h-9 text-dark-100 hover:text-white disabled:text-dark-400 disabled:cursor-not-allowed hover:bg-dark-600 rounded-full flex items-center justify-center transition"
           >
             <SkipForward size={18} />
+          </button>
+
+          {/* Repeat */}
+          <button
+            onClick={onToggleRepeat}
+            disabled={!isHost}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition disabled:cursor-not-allowed ${
+              repeat
+                ? 'text-primary-400 bg-primary-400/10 hover:bg-primary-400/20'
+                : 'text-dark-100 hover:text-white hover:bg-dark-600 disabled:text-dark-400'
+            }`}
+            title={repeat ? 'Tắt lặp lại' : 'Bật lặp lại'}
+          >
+            <Repeat size={16} />
           </button>
         </div>
 

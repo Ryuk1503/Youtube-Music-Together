@@ -1,6 +1,6 @@
-import { ListMusic, X, Music } from 'lucide-react';
+import { ListMusic, X, Music, ChevronUp, ChevronDown } from 'lucide-react';
 
-export default function Queue({ queue, currentIndex, onRemove }) {
+export default function Queue({ queue, currentIndex, onRemove, onMove }) {
   const upcoming = queue.slice(currentIndex + 1);
   const currentSong = currentIndex >= 0 ? queue[currentIndex] : null;
 
@@ -72,13 +72,34 @@ export default function Queue({ queue, currentIndex, onRemove }) {
                             {song.author} • {song.addedBy}
                           </p>
                         </div>
-                        <button
-                          onClick={() => onRemove(actualIndex)}
-                          className="flex-shrink-0 w-7 h-7 flex items-center justify-center text-dark-300 hover:text-red-400 hover:bg-red-400/10 rounded opacity-0 group-hover:opacity-100 transition"
-                          title="Xóa khỏi hàng đợi"
-                        >
-                          <X size={14} />
-                        </button>
+                        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
+                          {/* Move up */}
+                          <button
+                            onClick={() => onMove(actualIndex, actualIndex - 1)}
+                            disabled={i === 0}
+                            className="w-6 h-6 flex items-center justify-center text-dark-300 hover:text-white hover:bg-dark-500 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
+                            title="Di chuy\u1ec3n l\u00ean"
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          {/* Move down */}
+                          <button
+                            onClick={() => onMove(actualIndex, actualIndex + 1)}
+                            disabled={i === upcoming.length - 1}
+                            className="w-6 h-6 flex items-center justify-center text-dark-300 hover:text-white hover:bg-dark-500 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
+                            title="Di chuy\u1ec3n xu\u1ed1ng"
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                          {/* Remove */}
+                          <button
+                            onClick={() => onRemove(actualIndex)}
+                            className="w-6 h-6 flex items-center justify-center text-dark-300 hover:text-red-400 hover:bg-red-400/10 rounded transition"
+                            title="X\u00f3a kh\u1ecfi h\u00e0ng \u0111\u1ee3i"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

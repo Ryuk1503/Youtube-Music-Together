@@ -15,6 +15,7 @@ function createRoom({ name, password, host }) {
     queue: [], // [{ videoId, title, thumbnail, duration, addedBy }]
     currentIndex: -1,
     isPlaying: false,
+    repeat: false, // repeat queue when last song ends
     currentTime: 0,
     lastSyncedAt: Date.now(),
     messages: [], // [{ username, text, timestamp }]
@@ -85,6 +86,8 @@ function deleteRoom(roomId) {
   rooms.delete(roomId);
 }
 
+const MAX_QUEUE_SIZE = 200;
+
 function getPlaybackState(room) {
   let currentTime = room.currentTime;
   if (room.isPlaying) {
@@ -96,6 +99,7 @@ function getPlaybackState(room) {
     isPlaying: room.isPlaying,
     currentTime,
     queue: room.queue,
+    repeat: room.repeat,
   };
 }
 
@@ -106,6 +110,7 @@ function updatePlaybackState(room, { isPlaying, currentTime }) {
 }
 
 function addToQueue(room, song) {
+  if (room.queue.length >= MAX_QUEUE_SIZE) return null;
   room.queue.push(song);
   // If nothing is playing, start playing this song
   if (room.currentIndex === -1) {
@@ -132,11 +137,35 @@ function nextSong(room) {
     room.lastSyncedAt = Date.now();
     return room.queue[room.currentIndex];
   }
-  // No more songs
+  // Last song: repeat or stop
+  if (room.repeat && room.queue.length > 0) {
+    room.currentIndex = 0;
+    room.currentTime = 0;
+    room.isPlaying = true;
+    room.lastSyncedAt = Date.now();
+    return room.queue[0];
+  }
   room.isPlaying = false;
   room.currentTime = 0;
   room.lastSyncedAt = Date.now();
   return null;
+}
+
+function toggleRepeat(room) {
+  room.repeat = !room.repeat;
+  return room.repeat;
+}
+
+function moveInQueue(room, fromIndex, toIndex) {
+  // Can only move upcoming songs (after currentIndex)
+  if (fromIndex <= room.currentIndex || toIndex <= room.currentIndex) return null;
+  if (fromIndex < 0 || fromIndex >= room.queue.length) return null;
+  if (toIndex < 0 || toIndex >= room.queue.length) return null;
+  if (fromIndex === toIndex) return null;
+
+  const [song] = room.queue.splice(fromIndex, 1);
+  room.queue.splice(toIndex, 0, song);
+  return room.queue;
 }
 
 module.exports = {
@@ -152,4 +181,6 @@ module.exports = {
   addToQueue,
   removeFromQueue,
   nextSong,
+  toggleRepeat,
+  moveInQueue,
 };

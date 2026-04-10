@@ -10,6 +10,8 @@ const {
   addToQueue,
   removeFromQueue,
   nextSong,
+  toggleRepeat,
+  moveInQueue,
 } = require('../utils/roomManager');
 
 function setupSocket(io) {
@@ -194,6 +196,32 @@ function setupSocket(io) {
       });
 
       callback?.({ success: true });
+    });
+
+    socket.on('queue:move', ({ fromIndex, toIndex }, callback) => {
+      const room = findRoomBySocket(socket.id);
+      if (!room) return callback?.({ success: false });
+
+      const result = moveInQueue(room, fromIndex, toIndex);
+      if (!result) return callback?.({ success: false, error: 'Cannot move this song' });
+
+      io.to(room.id).emit('queue:updated', {
+        queue: room.queue,
+        currentIndex: room.currentIndex,
+      });
+
+      callback?.({ success: true });
+    });
+
+    // --- REPEAT ---
+
+    socket.on('player:toggleRepeat', (callback) => {
+      const room = findRoomBySocket(socket.id);
+      if (!room || room.hostSocketId !== socket.id) return callback?.({ success: false });
+
+      const repeat = toggleRepeat(room);
+      io.to(room.id).emit('player:repeatChanged', { repeat });
+      callback?.({ success: true, repeat });
     });
 
     // --- CHAT EVENTS ---

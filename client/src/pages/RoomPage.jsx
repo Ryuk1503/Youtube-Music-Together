@@ -31,7 +31,7 @@ export default function RoomPage() {
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showMembers, setShowMembers] = useState(false);
-  const [songLoading, setSongLoading] = useState(false);
+  const [repeat, setRepeat] = useState(false);
 
   // Join room on mount
   useEffect(() => {
@@ -56,6 +56,7 @@ export default function RoomPage() {
         setCurrentSong(res.playbackState.currentSong);
         setIsPlaying(res.playbackState.isPlaying);
         setCurrentTime(res.playbackState.currentTime);
+        setRepeat(res.playbackState.repeat || false);
       }
 
       setLoading(false);
@@ -154,6 +155,10 @@ export default function RoomPage() {
       setMessages((prev) => [...prev, message]);
     };
 
+    const onRepeatChanged = ({ repeat: r }) => {
+      setRepeat(r);
+    };
+
     socket.on('member:joined', onMemberJoined);
     socket.on('member:left', onMemberLeft);
     socket.on('room:hostChanged', onHostChanged);
@@ -163,6 +168,7 @@ export default function RoomPage() {
     socket.on('player:songChanged', onSongChanged);
     socket.on('queue:updated', onQueueUpdated);
     socket.on('chat:message', onChatMessage);
+    socket.on('player:repeatChanged', onRepeatChanged);
 
     return () => {
       socket.off('member:joined', onMemberJoined);
@@ -174,6 +180,7 @@ export default function RoomPage() {
       socket.off('player:songChanged', onSongChanged);
       socket.off('queue:updated', onQueueUpdated);
       socket.off('chat:message', onChatMessage);
+      socket.off('player:repeatChanged', onRepeatChanged);
     };
   }, [socket, user]);
 
@@ -228,6 +235,23 @@ export default function RoomPage() {
     },
     [socket]
   );
+
+  const handleMoveInQueue = useCallback(
+    (fromIndex, toIndex) => {
+      if (!socket) return;
+      socket.emit('queue:move', { fromIndex, toIndex }, (res) => {
+        if (!res.success) console.error('Failed to move in queue');
+      });
+    },
+    [socket]
+  );
+
+  const handleToggleRepeat = useCallback(() => {
+    if (!isHost || !socket) return;
+    socket.emit('player:toggleRepeat', (res) => {
+      if (!res.success) console.error('Failed to toggle repeat');
+    });
+  }, [isHost, socket]);
 
   const handleSendMessage = useCallback(
     (text) => {
@@ -302,11 +326,13 @@ export default function RoomPage() {
             duration={duration}
             volume={volume}
             isHost={isHost}
+            repeat={repeat}
             onPlay={handlePlay}
             onPause={handlePause}
             onSeek={handleSeek}
             onNext={handleNext}
             onVolumeChange={handleVolumeChange}
+            onToggleRepeat={handleToggleRepeat}
             ytContainerId={yt.CONTAINER_ID}
           />
           <Chat messages={messages} onSendMessage={handleSendMessage} username={user?.username} />
@@ -319,6 +345,7 @@ export default function RoomPage() {
             queue={queue}
             currentIndex={currentIndex}
             onRemove={handleRemoveFromQueue}
+            onMove={handleMoveInQueue}
           />
         </div>
       </div>
