@@ -51,10 +51,15 @@ app.get('/api/health', (req, res) => {
 setupSocket(io);
 
 // Serve built client in production
-const clientDist = path.join(__dirname, '../../client/dist');
+const clientDist = path.join(__dirname, '../public');
 app.use(express.static(clientDist));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'));
+  const indexPath = path.join(clientDist, 'index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('Frontend not built. Run: cd ../client && npm install && npm run build --outDir ../server/public');
+  }
 });
 
 // Start server
