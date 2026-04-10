@@ -5,7 +5,6 @@ import {
   Volume2,
   VolumeX,
   Music,
-  Loader2,
 } from 'lucide-react';
 
 function formatTime(seconds) {
@@ -18,7 +17,6 @@ function formatTime(seconds) {
 export default function Player({
   currentSong,
   isPlaying,
-  songLoading,
   currentTime,
   duration,
   volume,
@@ -28,6 +26,7 @@ export default function Player({
   onSeek,
   onNext,
   onVolumeChange,
+  ytContainerId,
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -47,29 +46,21 @@ export default function Player({
 
   return (
     <div className="p-5 flex-shrink-0">
-      {/* Thumbnail */}
+      {/* YouTube Player / Thumbnail area */}
       <div className="relative aspect-video bg-dark-600 rounded-xl overflow-hidden mb-4">
-        {currentSong ? (
-          <img
-            src={currentSong.thumbnail}
-            alt={currentSong.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-dark-300">
+        {/* YouTube IFrame renders here */}
+        <div id={ytContainerId} className="w-full h-full" />
+
+        {/* Placeholder when no song */}
+        {!currentSong && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-dark-300 bg-dark-600 z-10">
             <Music size={48} className="mb-2" />
             <span className="text-sm">Chưa có bài hát nào</span>
           </div>
         )}
 
-        {songLoading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
-          </div>
-        )}
-
-        {currentSong && isPlaying && !songLoading && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-full">
+        {currentSong && isPlaying && (
+          <div className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-full z-10">
             <div className="flex gap-0.5 items-end h-3">
               <div className="w-0.5 bg-primary-400 rounded-full animate-pulse" style={{ height: '60%', animationDelay: '0s' }} />
               <div className="w-0.5 bg-primary-400 rounded-full animate-pulse" style={{ height: '100%', animationDelay: '0.2s' }} />

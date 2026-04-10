@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import api from '../api';
+import useYouTubePlayer from '../hooks/useYouTubePlayer';
 import Player from '../components/Player';
 import SearchPanel from '../components/SearchPanel';
 import Queue from '../components/Queue';
@@ -16,7 +16,7 @@ export default function RoomPage() {
   const location = useLocation();
   const { user } = useAuth();
   const socket = useSocket();
-  const audioRef = useRef(null);
+  const yt = useYouTubePlayer();
 
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
@@ -69,51 +69,34 @@ export default function RoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // Fetch audio URL from Piped API then load into audio element
+  // Load video into YouTube player when song changes
   useEffect(() => {
-    if (!currentSong) {
-      setSongLoading(false);
-      return;
-    }
-
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    let cancelled = false;
-    setSongLoading(true);
+    if (!currentSong || !yt.ready) return;
+    console.log('Loading video:', currentSong.videoId);
     setCurrentTime(0);
     setDuration(0);
-    audio.pause();
+    yt.loadVideo(currentSong.videoId);
+    yt.setVolume(volume);
+  }, [currentSong?.videoId, yt.ready]);
 
-    const loadAudio = async () => {
-      try {
-        const res = await api.get(`/youtube/audio/${currentSong.videoId}`);
-        if (cancelled) return;
+  // Time tracking from YouTube player
+  useEffect(() => {
+    if (!yt.ready) return;
+    const interval = setInterval(() => {
+      const ct = yt.getCurrentTime();
+      const dur = yt.getDuration();
+      if (ct > 0) setCurrentTime(ct);
+      if (dur > 0) setDuration(dur);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [yt.ready, yt.getCurrentTime, yt.getDuration]);
 
-        audio.src = res.data.audioUrl;
-        audio.volume = volume;
-        audio.load();
-
-        const onCanPlay = () => {
-          if (cancelled) return;
-          setSongLoading(false);
-          setDuration(audio.duration || 0);
-          if (isPlaying) {
-            audio.play().catch(() => {});
-          }
-        };
-
-        audio.addEventListener('canplay', onCanPlay, { once: true });
-      } catch (err) {
-        if (cancelled) return;
-        console.error('Failed to get audio URL:', err);
-        setSongLoading(false);
-      }
+  // Handle song ended
+  useEffect(() => {
+    yt.onEndedRef.current = () => {
+      if (isHost && socket) socket.emit('player:ended');
     };
-
-    loadAudio();
-    return () => { cancelled = true; };
-  }, [currentSong?.videoId]);
+  }, [isHost, socket, yt.onEndedRef]);
 
   // Socket event listeners
   useEffect(() => {
@@ -135,26 +118,20 @@ export default function RoomPage() {
     const onPlayerPlay = ({ currentTime: ct }) => {
       setIsPlaying(true);
       setCurrentTime(ct);
-      if (audioRef.current) {
-        audioRef.current.currentTime = ct;
-        audioRef.current.play().catch(() => {});
-      }
+      yt.seekTo(ct);
+      yt.play();
     };
 
     const onPlayerPause = ({ currentTime: ct }) => {
       setIsPlaying(false);
       setCurrentTime(ct);
-      if (audioRef.current) {
-        audioRef.current.currentTime = ct;
-        audioRef.current.pause();
-      }
+      yt.seekTo(ct);
+      yt.pause();
     };
 
     const onPlayerSeek = ({ currentTime: ct }) => {
       setCurrentTime(ct);
-      if (audioRef.current) {
-        audioRef.current.currentTime = ct;
-      }
+      yt.seekTo(ct);
     };
 
     const onSongChanged = ({ playbackState }) => {
@@ -200,38 +177,33 @@ export default function RoomPage() {
   // Host controls
   const handlePlay = useCallback(() => {
     if (!isHost || !socket) return;
-    const ct = audioRef.current?.currentTime || 0;
-    audioRef.current?.play().catch(() => {});
+    const ct = yt.getCurrentTime();
+    yt.play();
     setIsPlaying(true);
     socket.emit('player:play', { currentTime: ct });
-  }, [isHost, socket]);
+  }, [isHost, socket, yt]);
 
   const handlePause = useCallback(() => {
     if (!isHost || !socket) return;
-    const ct = audioRef.current?.currentTime || 0;
-    audioRef.current?.pause();
+    const ct = yt.getCurrentTime();
+    yt.pause();
     setIsPlaying(false);
     socket.emit('player:pause', { currentTime: ct });
-  }, [isHost, socket]);
+  }, [isHost, socket, yt]);
 
   const handleSeek = useCallback(
     (time) => {
       if (!isHost || !socket) return;
-      if (audioRef.current) audioRef.current.currentTime = time;
+      yt.seekTo(time);
       setCurrentTime(time);
       socket.emit('player:seek', { currentTime: time });
     },
-    [isHost, socket]
+    [isHost, socket, yt]
   );
 
   const handleNext = useCallback(() => {
     if (!isHost || !socket) return;
     socket.emit('player:next');
-  }, [isHost, socket]);
-
-  const handleEnded = useCallback(() => {
-    if (!isHost || !socket) return;
-    socket.emit('player:ended');
   }, [isHost, socket]);
 
   const handleAddToQueue = useCallback(
@@ -269,16 +241,8 @@ export default function RoomPage() {
 
   const handleVolumeChange = useCallback((v) => {
     setVolume(v);
-    if (audioRef.current) audioRef.current.volume = v;
-  }, []);
-
-  // Time update for seek bar
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      setDuration(audioRef.current.duration || 0);
-    }
-  };
+    yt.setVolume(v);
+  }, [yt]);
 
   if (loading) {
     return (
@@ -290,13 +254,6 @@ export default function RoomPage() {
 
   return (
     <div className="h-screen flex flex-col bg-dark-900 overflow-hidden">
-      {/* Hidden audio element — streams through server proxy */}
-      <audio
-        ref={audioRef}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={handleEnded}
-        onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-      />
 
       {/* Header */}
       <header className="bg-dark-800 border-b border-dark-500 px-4 py-3 flex items-center justify-between flex-shrink-0">
@@ -338,7 +295,6 @@ export default function RoomPage() {
           <Player
             currentSong={currentSong}
             isPlaying={isPlaying}
-            songLoading={songLoading}
             currentTime={currentTime}
             duration={duration}
             volume={volume}
@@ -348,6 +304,7 @@ export default function RoomPage() {
             onSeek={handleSeek}
             onNext={handleNext}
             onVolumeChange={handleVolumeChange}
+            ytContainerId={yt.CONTAINER_ID}
           />
           <Chat messages={messages} onSendMessage={handleSendMessage} username={user?.username} />
         </div>
