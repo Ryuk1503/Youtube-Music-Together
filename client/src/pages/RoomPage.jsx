@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import useYouTubePlayer from '../hooks/useYouTubePlayer';
 import Player from '../components/Player';
 import SearchPanel from '../components/SearchPanel';
 import Queue from '../components/Queue';
@@ -16,7 +15,7 @@ export default function RoomPage() {
   const location = useLocation();
   const { user } = useAuth();
   const socket = useSocket();
-  const yt = useYouTubePlayer();
+  const audioRef = useRef(null);
 
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
@@ -69,40 +68,37 @@ export default function RoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // Load video into YouTube player when current song changes
+  // Load audio when current song changes (proxy through server)
   useEffect(() => {
-    if (!currentSong || !yt.ready) return;
+    if (!currentSong) {
+      setSongLoading(false);
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
     setSongLoading(true);
     setCurrentTime(0);
     setDuration(0);
-    yt.loadVideo(currentSong.videoId);
-    yt.setVolume(volume);
-    // songLoading will be cleared when time tracking picks up duration
-  }, [currentSong?.videoId, yt.ready]);
+    audio.pause();
 
-  // Time tracking from YouTube player
-  useEffect(() => {
-    if (!yt.ready) return;
-    const interval = setInterval(() => {
-      const ct = yt.getCurrentTime();
-      const dur = yt.getDuration();
-      setCurrentTime(ct);
-      if (dur > 0) {
-        setDuration(dur);
-        if (songLoading) setSongLoading(false);
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [yt.ready, yt.getCurrentTime, yt.getDuration, songLoading]);
+    // Use server proxy endpoint — avoids YouTube IP-lock
+    audio.src = `/api/youtube/stream/${currentSong.videoId}`;
+    audio.volume = volume;
+    audio.load();
 
-  // Handle song ended
-  useEffect(() => {
-    yt.onEndedRef.current = () => {
-      if (isHost && socket) {
-        socket.emit('player:ended');
+    const onCanPlay = () => {
+      setSongLoading(false);
+      setDuration(audio.duration || 0);
+      if (isPlaying) {
+        audio.play().catch(() => {});
       }
     };
-  }, [isHost, socket, yt.onEndedRef]);
+
+    audio.addEventListener('canplay', onCanPlay, { once: true });
+    return () => audio.removeEventListener('canplay', onCanPlay);
+  }, [currentSong?.videoId]);
 
   // Socket event listeners
   useEffect(() => {
@@ -124,20 +120,26 @@ export default function RoomPage() {
     const onPlayerPlay = ({ currentTime: ct }) => {
       setIsPlaying(true);
       setCurrentTime(ct);
-      yt.seekTo(ct);
-      yt.play();
+      if (audioRef.current) {
+        audioRef.current.currentTime = ct;
+        audioRef.current.play().catch(() => {});
+      }
     };
 
     const onPlayerPause = ({ currentTime: ct }) => {
       setIsPlaying(false);
       setCurrentTime(ct);
-      yt.seekTo(ct);
-      yt.pause();
+      if (audioRef.current) {
+        audioRef.current.currentTime = ct;
+        audioRef.current.pause();
+      }
     };
 
     const onPlayerSeek = ({ currentTime: ct }) => {
       setCurrentTime(ct);
-      yt.seekTo(ct);
+      if (audioRef.current) {
+        audioRef.current.currentTime = ct;
+      }
     };
 
     const onSongChanged = ({ playbackState }) => {
@@ -183,33 +185,38 @@ export default function RoomPage() {
   // Host controls
   const handlePlay = useCallback(() => {
     if (!isHost || !socket) return;
-    const ct = yt.getCurrentTime();
-    yt.play();
+    const ct = audioRef.current?.currentTime || 0;
+    audioRef.current?.play().catch(() => {});
     setIsPlaying(true);
     socket.emit('player:play', { currentTime: ct });
-  }, [isHost, socket, yt]);
+  }, [isHost, socket]);
 
   const handlePause = useCallback(() => {
     if (!isHost || !socket) return;
-    const ct = yt.getCurrentTime();
-    yt.pause();
+    const ct = audioRef.current?.currentTime || 0;
+    audioRef.current?.pause();
     setIsPlaying(false);
     socket.emit('player:pause', { currentTime: ct });
-  }, [isHost, socket, yt]);
+  }, [isHost, socket]);
 
   const handleSeek = useCallback(
     (time) => {
       if (!isHost || !socket) return;
-      yt.seekTo(time);
+      if (audioRef.current) audioRef.current.currentTime = time;
       setCurrentTime(time);
       socket.emit('player:seek', { currentTime: time });
     },
-    [isHost, socket, yt]
+    [isHost, socket]
   );
 
   const handleNext = useCallback(() => {
     if (!isHost || !socket) return;
     socket.emit('player:next');
+  }, [isHost, socket]);
+
+  const handleEnded = useCallback(() => {
+    if (!isHost || !socket) return;
+    socket.emit('player:ended');
   }, [isHost, socket]);
 
   const handleAddToQueue = useCallback(
@@ -245,11 +252,18 @@ export default function RoomPage() {
     navigate('/');
   };
 
-  // Sync volume to YouTube player
   const handleVolumeChange = useCallback((v) => {
     setVolume(v);
-    yt.setVolume(v);
-  }, [yt]);
+    if (audioRef.current) audioRef.current.volume = v;
+  }, []);
+
+  // Time update for seek bar
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+      setDuration(audioRef.current.duration || 0);
+    }
+  };
 
   if (loading) {
     return (
@@ -261,8 +275,13 @@ export default function RoomPage() {
 
   return (
     <div className="h-screen flex flex-col bg-dark-900 overflow-hidden">
-      {/* Hidden YouTube player */}
-      <div ref={yt.containerRef} className="absolute w-0 h-0 overflow-hidden" />
+      {/* Hidden audio element — streams through server proxy */}
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
+        onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+      />
 
       {/* Header */}
       <header className="bg-dark-800 border-b border-dark-500 px-4 py-3 flex items-center justify-between flex-shrink-0">
