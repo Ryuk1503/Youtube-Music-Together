@@ -18,7 +18,7 @@ function formatTime(seconds) {
 export default function Player({
   currentSong,
   isPlaying,
-  audioLoading,
+  songLoading,
   currentTime,
   duration,
   volume,
@@ -28,7 +28,6 @@ export default function Player({
   onSeek,
   onNext,
   onVolumeChange,
-  audioRef,
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -40,17 +39,10 @@ export default function Player({
   const handleVolumeChange = (e) => {
     const v = parseFloat(e.target.value) / 100;
     onVolumeChange(v);
-    if (audioRef.current) audioRef.current.volume = v;
   };
 
   const toggleMute = () => {
-    if (volume > 0) {
-      onVolumeChange(0);
-      if (audioRef.current) audioRef.current.volume = 0;
-    } else {
-      onVolumeChange(0.7);
-      if (audioRef.current) audioRef.current.volume = 0.7;
-    }
+    onVolumeChange(volume > 0 ? 0 : 0.7);
   };
 
   return (
@@ -70,13 +62,13 @@ export default function Player({
           </div>
         )}
 
-        {audioLoading && (
+        {songLoading && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
           </div>
         )}
 
-        {currentSong && isPlaying && !audioLoading && (
+        {currentSong && isPlaying && !songLoading && (
           <div className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-full">
             <div className="flex gap-0.5 items-end h-3">
               <div className="w-0.5 bg-primary-400 rounded-full animate-pulse" style={{ height: '60%', animationDelay: '0s' }} />
