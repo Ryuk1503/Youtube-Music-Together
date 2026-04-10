@@ -13,6 +13,11 @@ const {
   toggleRepeat,
   moveInQueue,
   errorSkipSong,
+  kickMember,
+  restrictMember,
+  unrestrictMember,
+  transferHost,
+  isRestricted,
 } = require('../utils/roomManager');
 
 function setupSocket(io) {
@@ -90,6 +95,7 @@ function setupSocket(io) {
         playbackState,
         members,
         messages: room.messages.slice(-50), // Last 50 messages
+        restricted: Array.from(room.restricted),
       });
 
       // Notify others only if new member
@@ -182,7 +188,9 @@ function setupSocket(io) {
         addedBy: socket.user.username,
       };
 
-      addToQueue(room, newSong);
+      const result = addToQueue(room, newSong, socket.user.userId);
+      if (result === 'restricted') return callback?.({ success: false, error: 'Bạn đã bị hạn chế thêm nhạc' });
+      if (!result) return callback?.({ success: false, error: 'Hàng đợi đã đầy' });
 
       io.to(room.id).emit('queue:updated', {
         queue: room.queue,
@@ -239,6 +247,57 @@ function setupSocket(io) {
       const repeat = toggleRepeat(room);
       io.to(room.id).emit('player:repeatChanged', { repeat });
       callback?.({ success: true, repeat });
+    });
+
+    // --- MEMBER MANAGEMENT (Host only) ---
+
+    socket.on('member:kick', ({ targetUserId }, callback) => {
+      const room = findRoomBySocket(socket.id);
+      if (!room || room.hostSocketId !== socket.id) return callback?.({ success: false });
+      if (String(targetUserId) === String(room.hostId)) return callback?.({ success: false, error: 'Cannot kick yourself' });
+
+      const kickedSocketId = kickMember(room, targetUserId);
+      if (!kickedSocketId) return callback?.({ success: false, error: 'Member not found' });
+
+      // Force the kicked socket to leave the room
+      const kickedSocket = io.sockets.sockets.get(kickedSocketId);
+      if (kickedSocket) {
+        kickedSocket.leave(room.id);
+        kickedSocket.emit('room:kicked');
+      }
+
+      io.to(room.id).emit('member:left', { userId: targetUserId });
+      io.to(room.id).emit('member:listUpdated', { members: Array.from(room.members.values()), restricted: Array.from(room.restricted) });
+      io.emit('rooms:updated');
+      callback?.({ success: true });
+    });
+
+    socket.on('member:restrict', ({ targetUserId }, callback) => {
+      const room = findRoomBySocket(socket.id);
+      if (!room || room.hostSocketId !== socket.id) return callback?.({ success: false });
+      if (String(targetUserId) === String(room.hostId)) return callback?.({ success: false });
+
+      if (isRestricted(room, targetUserId)) {
+        unrestrictMember(room, targetUserId);
+      } else {
+        restrictMember(room, targetUserId);
+      }
+
+      io.to(room.id).emit('member:listUpdated', { members: Array.from(room.members.values()), restricted: Array.from(room.restricted) });
+      callback?.({ success: true, restricted: Array.from(room.restricted) });
+    });
+
+    socket.on('member:transferHost', ({ targetUserId }, callback) => {
+      const room = findRoomBySocket(socket.id);
+      if (!room || room.hostSocketId !== socket.id) return callback?.({ success: false });
+      if (String(targetUserId) === String(room.hostId)) return callback?.({ success: false });
+
+      const transferred = transferHost(room, targetUserId);
+      if (!transferred) return callback?.({ success: false });
+
+      io.to(room.id).emit('room:hostChanged', { hostId: room.hostId });
+      io.to(room.id).emit('member:listUpdated', { members: Array.from(room.members.values()), restricted: Array.from(room.restricted) });
+      callback?.({ success: true });
     });
 
     // --- CHAT EVENTS ---

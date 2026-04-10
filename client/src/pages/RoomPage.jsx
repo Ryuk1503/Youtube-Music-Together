@@ -8,7 +8,7 @@ import SearchPanel from '../components/SearchPanel';
 import Queue from '../components/Queue';
 import Chat from '../components/Chat';
 import MemberList from '../components/MemberList';
-import { ArrowLeft, Crown, Users } from 'lucide-react';
+import { ArrowLeft, Crown, Users, Music, ListMusic } from 'lucide-react';
 
 export default function RoomPage() {
   const { roomId } = useParams();
@@ -32,6 +32,8 @@ export default function RoomPage() {
   const [loading, setLoading] = useState(true);
   const [showMembers, setShowMembers] = useState(false);
   const [repeat, setRepeat] = useState(false);
+  const [restricted, setRestricted] = useState([]);
+  const [mobileTab, setMobileTab] = useState('player'); // 'player' | 'queue' | 'members'
 
   // Join room on mount
   useEffect(() => {
@@ -49,6 +51,7 @@ export default function RoomPage() {
       setMembers(res.members);
       setMessages(res.messages || []);
       setIsHost(res.room.hostId === user.id);
+      setRestricted(res.restricted || []);
 
       if (res.playbackState) {
         setQueue(res.playbackState.queue);
@@ -167,6 +170,16 @@ export default function RoomPage() {
       setRepeat(r);
     };
 
+    const onMemberListUpdated = ({ members: m, restricted: r }) => {
+      setMembers(m);
+      setRestricted(r || []);
+    };
+
+    const onKicked = () => {
+      alert('Bạn đã bị đuổi khỏi phòng');
+      navigate('/');
+    };
+
     socket.on('member:joined', onMemberJoined);
     socket.on('member:left', onMemberLeft);
     socket.on('room:hostChanged', onHostChanged);
@@ -177,6 +190,8 @@ export default function RoomPage() {
     socket.on('queue:updated', onQueueUpdated);
     socket.on('chat:message', onChatMessage);
     socket.on('player:repeatChanged', onRepeatChanged);
+    socket.on('member:listUpdated', onMemberListUpdated);
+    socket.on('room:kicked', onKicked);
 
     return () => {
       socket.off('member:joined', onMemberJoined);
@@ -189,6 +204,8 @@ export default function RoomPage() {
       socket.off('queue:updated', onQueueUpdated);
       socket.off('chat:message', onChatMessage);
       socket.off('player:repeatChanged', onRepeatChanged);
+      socket.off('member:listUpdated', onMemberListUpdated);
+      socket.off('room:kicked', onKicked);
     };
   }, [socket, user]);
 
@@ -228,7 +245,9 @@ export default function RoomPage() {
     (song) => {
       if (!socket) return;
       socket.emit('queue:add', song, (res) => {
-        if (!res.success) console.error('Failed to add to queue');
+        if (!res.success) {
+          alert(res.error || 'Không thể thêm bài hát');
+        }
       });
     },
     [socket]
@@ -261,6 +280,37 @@ export default function RoomPage() {
     });
   }, [isHost, socket]);
 
+  const handleKick = useCallback(
+    (targetUserId) => {
+      if (!isHost || !socket) return;
+      socket.emit('member:kick', { targetUserId }, (res) => {
+        if (!res.success) console.error('Failed to kick');
+      });
+    },
+    [isHost, socket]
+  );
+
+  const handleRestrict = useCallback(
+    (targetUserId) => {
+      if (!isHost || !socket) return;
+      socket.emit('member:restrict', { targetUserId }, (res) => {
+        if (!res.success) console.error('Failed to restrict');
+      });
+    },
+    [isHost, socket]
+  );
+
+  const handleTransferHost = useCallback(
+    (targetUserId) => {
+      if (!isHost || !socket) return;
+      if (!confirm('Bạn có chắc muốn trao quyền Host?')) return;
+      socket.emit('member:transferHost', { targetUserId }, (res) => {
+        if (!res.success) console.error('Failed to transfer host');
+      });
+    },
+    [isHost, socket]
+  );
+
   const handleSendMessage = useCallback(
     (text) => {
       if (!socket) return;
@@ -287,6 +337,33 @@ export default function RoomPage() {
     );
   }
 
+  const playerProps = {
+    currentSong,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isHost,
+    repeat,
+    onPlay: handlePlay,
+    onPause: handlePause,
+    onSeek: handleSeek,
+    onNext: handleNext,
+    onVolumeChange: handleVolumeChange,
+    onToggleRepeat: handleToggleRepeat,
+  };
+
+  const memberListProps = {
+    members,
+    hostId: room?.hostId,
+    restricted,
+    isHost,
+    currentUserId: user?.id,
+    onKick: handleKick,
+    onRestrict: handleRestrict,
+    onTransferHost: handleTransferHost,
+  };
+
   return (
     <div className="h-screen flex flex-col bg-dark-900 overflow-hidden">
 
@@ -296,13 +373,12 @@ export default function RoomPage() {
           <button
             onClick={handleLeaveRoom}
             className="p-2 text-dark-200 hover:text-white hover:bg-dark-600 rounded-lg transition"
-            title="Rời phòng"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white">{room?.name}</h1>
+              <h1 className="text-lg font-bold text-white truncate max-w-[180px] md:max-w-none">{room?.name}</h1>
               {isHost && (
                 <span className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full">
                   <Crown size={12} />
@@ -314,58 +390,92 @@ export default function RoomPage() {
           </div>
         </div>
 
+        {/* Desktop members button */}
         <button
           onClick={() => setShowMembers(!showMembers)}
-          className="flex items-center gap-2 px-3 py-2 text-dark-100 hover:text-white hover:bg-dark-600 rounded-lg transition"
+          className="hidden md:flex items-center gap-2 px-3 py-2 text-dark-100 hover:text-white hover:bg-dark-600 rounded-lg transition"
         >
           <Users size={18} />
           <span className="text-sm font-medium">{members.length}</span>
         </button>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left column: Player + Chat */}
+      {/* YouTube player container — rendered ONCE, always in DOM for background audio */}
+      <div id={yt.CONTAINER_ID} className="fixed -left-[9999px] -top-[9999px] w-[1px] h-[1px]" />
+
+      {/* ===== DESKTOP LAYOUT (md+) ===== */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
         <div className="w-[420px] flex flex-col border-r border-dark-500 flex-shrink-0">
-          <Player
-            currentSong={currentSong}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            volume={volume}
-            isHost={isHost}
-            repeat={repeat}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onSeek={handleSeek}
-            onNext={handleNext}
-            onVolumeChange={handleVolumeChange}
-            onToggleRepeat={handleToggleRepeat}
-            ytContainerId={yt.CONTAINER_ID}
-          />
+          <Player {...playerProps}>
+            {currentSong && (
+              <img src={currentSong.thumbnail} alt="" className="w-full h-full object-cover" />
+            )}
+          </Player>
           <Chat messages={messages} onSendMessage={handleSendMessage} username={user?.username} />
         </div>
-
-        {/* Right column: Search + Queue */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <SearchPanel onAddToQueue={handleAddToQueue} />
-          <Queue
-            queue={queue}
-            currentIndex={currentIndex}
-            onRemove={handleRemoveFromQueue}
-            onMove={handleMoveInQueue}
-          />
+          <Queue queue={queue} currentIndex={currentIndex} onRemove={handleRemoveFromQueue} onMove={handleMoveInQueue} />
         </div>
       </div>
 
-      {/* Members sidebar overlay */}
       {showMembers && (
-        <MemberList
-          members={members}
-          hostId={room?.hostId}
-          onClose={() => setShowMembers(false)}
-        />
+        <div className="hidden md:block">
+          <MemberList {...memberListProps} onClose={() => setShowMembers(false)} />
+        </div>
       )}
+
+      {/* ===== MOBILE LAYOUT (<md) ===== */}
+      <div className="flex md:hidden flex-1 flex-col overflow-hidden">
+        <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'player' ? '' : 'hidden'}`}>
+          <Player {...playerProps}>
+            {currentSong && (
+              <img src={currentSong.thumbnail} alt="" className="w-full h-full object-cover" />
+            )}
+          </Player>
+          <Chat messages={messages} onSendMessage={handleSendMessage} username={user?.username} />
+        </div>
+
+        <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'queue' ? '' : 'hidden'}`}>
+          <SearchPanel onAddToQueue={handleAddToQueue} />
+          <Queue queue={queue} currentIndex={currentIndex} onRemove={handleRemoveFromQueue} onMove={handleMoveInQueue} />
+        </div>
+
+        <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'members' ? '' : 'hidden'}`}>
+          <MemberList {...memberListProps} inline />
+        </div>
+
+        {/* Mobile bottom tab bar */}
+        <nav className="flex-shrink-0 bg-dark-800 border-t border-dark-500 flex">
+          <button
+            onClick={() => setMobileTab('player')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition ${
+              mobileTab === 'player' ? 'text-primary-400' : 'text-dark-300'
+            }`}
+          >
+            <Music size={20} />
+            <span className="text-[10px] font-medium">Phát nhạc</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('queue')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition ${
+              mobileTab === 'queue' ? 'text-primary-400' : 'text-dark-300'
+            }`}
+          >
+            <ListMusic size={20} />
+            <span className="text-[10px] font-medium">Hàng đợi</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('members')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 transition ${
+              mobileTab === 'members' ? 'text-primary-400' : 'text-dark-300'
+            }`}
+          >
+            <Users size={20} />
+            <span className="text-[10px] font-medium">{members.length} TV</span>
+          </button>
+        </nav>
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export default function Player({
   onNext,
   onVolumeChange,
   onToggleRepeat,
-  ytContainerId,
+  children,
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -51,10 +51,8 @@ export default function Player({
     <div className="p-5 flex-shrink-0">
       {/* YouTube Player / Thumbnail area */}
       <div className="relative aspect-video bg-dark-600 rounded-xl overflow-hidden mb-4">
-        {/* YouTube IFrame renders here */}
-        <div id={ytContainerId} className="w-full h-full" />
+        {children}
 
-        {/* Placeholder when no song */}
         {!currentSong && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-dark-300 bg-dark-600 z-10">
             <Music size={48} className="mb-2" />

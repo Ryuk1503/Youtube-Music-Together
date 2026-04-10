@@ -12,6 +12,7 @@ function createRoom({ name, password, host }) {
     hostId: host.userId,
     hostSocketId: host.socketId,
     members: new Map(), // socketId -> { userId, username }
+    restricted: new Set(), // Set of userId strings that can't add songs
     queue: [], // [{ videoId, title, thumbnail, duration, addedBy }]
     currentIndex: -1,
     isPlaying: false,
@@ -109,8 +110,9 @@ function updatePlaybackState(room, { isPlaying, currentTime }) {
   room.lastSyncedAt = Date.now();
 }
 
-function addToQueue(room, song) {
+function addToQueue(room, song, userId) {
   if (room.queue.length >= MAX_QUEUE_SIZE) return null;
+  if (userId && room.restricted.has(String(userId))) return 'restricted';
   room.queue.push(song);
   // If nothing is playing, start playing this song
   if (room.currentIndex === -1) {
@@ -218,4 +220,43 @@ module.exports = {
   toggleRepeat,
   moveInQueue,
   errorSkipSong,
+  kickMember,
+  restrictMember,
+  unrestrictMember,
+  transferHost,
+  isRestricted,
 };
+
+function kickMember(room, targetUserId) {
+  for (const [socketId, member] of room.members) {
+    if (String(member.userId) === String(targetUserId)) {
+      room.members.delete(socketId);
+      room.restricted.delete(String(targetUserId));
+      return socketId;
+    }
+  }
+  return null;
+}
+
+function restrictMember(room, targetUserId) {
+  room.restricted.add(String(targetUserId));
+}
+
+function unrestrictMember(room, targetUserId) {
+  room.restricted.delete(String(targetUserId));
+}
+
+function transferHost(room, targetUserId) {
+  for (const [socketId, member] of room.members) {
+    if (String(member.userId) === String(targetUserId)) {
+      room.hostId = member.userId;
+      room.hostSocketId = socketId;
+      return true;
+    }
+  }
+  return false;
+}
+
+function isRestricted(room, userId) {
+  return room.restricted.has(String(userId));
+}
