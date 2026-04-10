@@ -99,7 +99,11 @@ export default function RoomPage() {
       setIsPlaying(false);
       if (isHost && socket) socket.emit('player:ended');
     };
-  }, [isHost, socket, yt.onPlayingRef, yt.onPausedRef, yt.onEndedRef]);
+    yt.onErrorRef.current = (errorCode) => {
+      // Error codes 100, 101, 150 = video not found or embedding disabled
+      if (isHost && socket) socket.emit('player:errorSkip');
+    };
+  }, [isHost, socket, yt.onPlayingRef, yt.onPausedRef, yt.onEndedRef, yt.onErrorRef]);
 
   // Socket event listeners
   useEffect(() => {

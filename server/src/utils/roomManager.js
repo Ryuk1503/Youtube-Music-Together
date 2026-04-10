@@ -156,6 +156,40 @@ function toggleRepeat(room) {
   return room.repeat;
 }
 
+function errorSkipSong(room) {
+  if (room.currentIndex < 0 || room.currentIndex >= room.queue.length) return null;
+
+  // Remove the errored song
+  room.queue.splice(room.currentIndex, 1);
+
+  if (room.queue.length === 0) {
+    room.currentIndex = -1;
+    room.isPlaying = false;
+    room.currentTime = 0;
+    room.lastSyncedAt = Date.now();
+    return null;
+  }
+
+  // After splice, the next song is now at currentIndex
+  if (room.currentIndex >= room.queue.length) {
+    // Was the last song
+    if (room.repeat) {
+      room.currentIndex = 0;
+    } else {
+      room.currentIndex = -1;
+      room.isPlaying = false;
+      room.currentTime = 0;
+      room.lastSyncedAt = Date.now();
+      return null;
+    }
+  }
+
+  room.currentTime = 0;
+  room.isPlaying = true;
+  room.lastSyncedAt = Date.now();
+  return room.queue[room.currentIndex];
+}
+
 function moveInQueue(room, fromIndex, toIndex) {
   // Can only move upcoming songs (after currentIndex)
   if (fromIndex <= room.currentIndex || toIndex <= room.currentIndex) return null;
@@ -183,4 +217,5 @@ module.exports = {
   nextSong,
   toggleRepeat,
   moveInQueue,
+  errorSkipSong,
 };

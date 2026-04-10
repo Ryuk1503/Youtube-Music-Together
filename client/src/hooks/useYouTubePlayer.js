@@ -8,6 +8,7 @@ export default function useYouTubePlayer() {
   const onEndedRef = useRef(null);
   const onPlayingRef = useRef(null);
   const onPausedRef = useRef(null);
+  const onErrorRef = useRef(null);
 
   useEffect(() => {
     let destroyed = false;
@@ -56,6 +57,7 @@ export default function useYouTubePlayer() {
           },
           onError: (event) => {
             console.error('YT Player error code:', event.data);
+            onErrorRef.current?.(event.data);
           },
         },
       });
@@ -129,6 +131,7 @@ export default function useYouTubePlayer() {
     onEndedRef,
     onPlayingRef,
     onPausedRef,
+    onErrorRef,
     CONTAINER_ID,
   };
 }

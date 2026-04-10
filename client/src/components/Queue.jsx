@@ -1,7 +1,10 @@
-import { ListMusic, X, Music, ChevronUp, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
+import { ListMusic, X, Music, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Queue({ queue, currentIndex, onRemove, onMove }) {
+  const [showPlayed, setShowPlayed] = useState(false);
   const upcoming = queue.slice(currentIndex + 1);
+  const played = currentIndex > 0 ? queue.slice(0, currentIndex) : [];
   const currentSong = currentIndex >= 0 ? queue[currentIndex] : null;
 
   return (
@@ -46,7 +49,7 @@ export default function Queue({ queue, currentIndex, onRemove, onMove }) {
 
             {/* Upcoming songs */}
             {upcoming.length > 0 && (
-              <div>
+              <div className="mb-3">
                 <p className="text-xs text-dark-300 uppercase font-semibold tracking-wider mb-2">
                   Tiếp theo ({upcoming.length})
                 </p>
@@ -72,38 +75,73 @@ export default function Queue({ queue, currentIndex, onRemove, onMove }) {
                             {song.author} • {song.addedBy}
                           </p>
                         </div>
-                        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
-                          {/* Move up */}
+                        <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
                           <button
                             onClick={() => onMove(actualIndex, actualIndex - 1)}
                             disabled={i === 0}
-                            className="w-6 h-6 flex items-center justify-center text-dark-300 hover:text-white hover:bg-dark-500 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
-                            title="Di chuy\u1ec3n l\u00ean"
+                            className="w-8 h-8 flex items-center justify-center text-dark-300 hover:text-white hover:bg-dark-500 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition"
                           >
-                            <ChevronUp size={14} />
+                            <ChevronUp size={16} />
                           </button>
-                          {/* Move down */}
                           <button
                             onClick={() => onMove(actualIndex, actualIndex + 1)}
                             disabled={i === upcoming.length - 1}
-                            className="w-6 h-6 flex items-center justify-center text-dark-300 hover:text-white hover:bg-dark-500 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
-                            title="Di chuy\u1ec3n xu\u1ed1ng"
+                            className="w-8 h-8 flex items-center justify-center text-dark-300 hover:text-white hover:bg-dark-500 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition"
                           >
-                            <ChevronDown size={14} />
+                            <ChevronDown size={16} />
                           </button>
-                          {/* Remove */}
                           <button
                             onClick={() => onRemove(actualIndex)}
-                            className="w-6 h-6 flex items-center justify-center text-dark-300 hover:text-red-400 hover:bg-red-400/10 rounded transition"
-                            title="X\u00f3a kh\u1ecfi h\u00e0ng \u0111\u1ee3i"
+                            className="w-8 h-8 flex items-center justify-center text-dark-300 hover:text-red-400 hover:bg-red-400/10 rounded-md transition"
                           >
-                            <X size={14} />
+                            <X size={16} />
                           </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Played songs (collapsible) */}
+            {played.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowPlayed(!showPlayed)}
+                  className="flex items-center gap-1.5 text-xs text-dark-300 uppercase font-semibold tracking-wider mb-2 hover:text-dark-100 transition"
+                >
+                  <ChevronRight
+                    size={14}
+                    className={`transition-transform ${showPlayed ? 'rotate-90' : ''}`}
+                  />
+                  Đã phát ({played.length})
+                </button>
+                {showPlayed && (
+                  <div className="space-y-1">
+                    {played.map((song, i) => (
+                      <div
+                        key={`${song.videoId}-played-${i}`}
+                        className="flex items-center gap-3 p-2 rounded-lg opacity-50"
+                      >
+                        <span className="w-5 text-xs text-dark-400 text-center flex-shrink-0">
+                          {i + 1}
+                        </span>
+                        <img
+                          src={song.thumbnail}
+                          alt=""
+                          className="w-10 h-7 rounded object-cover flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-dark-200 truncate">{song.title}</p>
+                          <p className="text-xs text-dark-400 truncate">
+                            {song.author} • {song.addedBy}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -12,6 +12,7 @@ const {
   nextSong,
   toggleRepeat,
   moveInQueue,
+  errorSkipSong,
 } = require('../utils/roomManager');
 
 function setupSocket(io) {
@@ -152,6 +153,22 @@ function setupSocket(io) {
       io.to(room.id).emit('player:songChanged', {
         playbackState: getPlaybackState(room),
       });
+    });
+
+    // Video error (e.g. embedding disabled) - remove song and skip
+    socket.on('player:errorSkip', () => {
+      const room = findRoomBySocket(socket.id);
+      if (!room || room.hostSocketId !== socket.id) return;
+
+      const skipped = errorSkipSong(room);
+      io.to(room.id).emit('player:songChanged', {
+        playbackState: getPlaybackState(room),
+      });
+      io.to(room.id).emit('queue:updated', {
+        queue: room.queue,
+        currentIndex: room.currentIndex,
+      });
+      console.log(`⚠️ Error skip in room ${room.name}`);
     });
 
     // --- QUEUE EVENTS ---
