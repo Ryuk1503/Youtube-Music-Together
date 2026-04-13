@@ -35,6 +35,68 @@ export default function RoomPage() {
   const [restricted, setRestricted] = useState([]);
   const [mobileTab, setMobileTab] = useState('player'); // 'player' | 'queue' | 'members'
   const pendingSeekRef = useRef(0); // for syncing playback position on join
+  const desktopVideoRef = useRef(null);
+  const mobileVideoRef = useRef(null);
+  const ytElRef = useRef(null);
+
+  // Create the single yt-player div and move it into the correct container
+  useEffect(() => {
+    if (!ytElRef.current) {
+      const el = document.createElement('div');
+      el.id = yt.CONTAINER_ID;
+      el.style.width = '100%';
+      el.style.height = '100%';
+      ytElRef.current = el;
+    }
+    // Determine which container is visible: mobile on small screens, desktop on md+
+    const isMobile = window.innerWidth < 768;
+    const target = isMobile ? mobileVideoRef.current : desktopVideoRef.current;
+    if (target && ytElRef.current.parentNode !== target) {
+      target.appendChild(ytElRef.current);
+    }
+  });
+
+  // Also move on resize (e.g. rotating phone)
+  useEffect(() => {
+    const onResize = () => {
+      if (!ytElRef.current) return;
+      const isMobile = window.innerWidth < 768;
+      const target = isMobile ? mobileVideoRef.current : desktopVideoRef.current;
+      if (target && ytElRef.current.parentNode !== target) {
+        target.appendChild(ytElRef.current);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Request Picture-in-Picture when user leaves the page/app on mobile
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isPlaying) {
+        const iframe = yt.getIframe();
+        if (!iframe) return;
+        // Try to enter PiP via the video element inside the iframe
+        // For same-origin, we can access iframe.contentWindow.document
+        // For cross-origin (YouTube), we use requestPictureInPicture on the iframe itself (Chrome 116+)
+        if (document.pictureInPictureEnabled && iframe.requestPictureInPicture) {
+          iframe.requestPictureInPicture().catch(() => {});
+        } else if (document.pictureInPictureEnabled) {
+          // Fallback: try to get the video element
+          try {
+            const video = iframe.contentDocument?.querySelector('video');
+            if (video && !document.pictureInPictureElement) {
+              video.requestPictureInPicture().catch(() => {});
+            }
+          } catch (e) {
+            // Cross-origin, can't access — browser may handle PiP automatically
+          }
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [isPlaying, yt]);
 
   // Join room on mount
   useEffect(() => {
@@ -411,16 +473,11 @@ export default function RoomPage() {
         </button>
       </header>
 
-      {/* YouTube player container — rendered ONCE, always in DOM for background audio */}
-      <div id={yt.CONTAINER_ID} className="fixed -left-[9999px] -top-[9999px] w-[1px] h-[1px]" />
-
       {/* ===== DESKTOP LAYOUT (md+) ===== */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         <div className="w-[420px] flex flex-col border-r border-dark-500 flex-shrink-0">
           <Player {...playerProps}>
-            {currentSong && (
-              <img src={currentSong.thumbnail} alt="" className="w-full h-full object-cover" />
-            )}
+            <div ref={desktopVideoRef} className="w-full h-full" />
           </Player>
           <Chat messages={messages} onSendMessage={handleSendMessage} username={user?.username} />
         </div>
@@ -440,9 +497,7 @@ export default function RoomPage() {
       <div className="flex md:hidden flex-1 flex-col overflow-hidden">
         <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'player' ? '' : 'hidden'}`}>
           <Player {...playerProps}>
-            {currentSong && (
-              <img src={currentSong.thumbnail} alt="" className="w-full h-full object-cover" />
-            )}
+            <div ref={mobileVideoRef} className="w-full h-full" />
           </Player>
           <Chat messages={messages} onSendMessage={handleSendMessage} username={user?.username} />
         </div>

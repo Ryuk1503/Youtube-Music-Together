@@ -45,7 +45,15 @@ export default function useYouTubePlayer() {
           origin: window.location.origin,
         },
         events: {
-          onReady: () => setReady(true),
+          onReady: (event) => {
+            // Enable PiP and autoplay on the iframe
+            const iframe = event.target.getIframe();
+            if (iframe) {
+              iframe.setAttribute('allow', 'autoplay; picture-in-picture; encrypted-media');
+              iframe.setAttribute('allowfullscreen', '');
+            }
+            setReady(true);
+          },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
               onPlayingRef.current?.();
@@ -118,6 +126,10 @@ export default function useYouTubePlayer() {
     return playerRef.current?.getDuration?.() || 0;
   }, []);
 
+  const getIframe = useCallback(() => {
+    return playerRef.current?.getIframe?.() || null;
+  }, []);
+
   return {
     ready,
     loadVideo,
@@ -128,6 +140,7 @@ export default function useYouTubePlayer() {
     setVolume,
     getCurrentTime,
     getDuration,
+    getIframe,
     onEndedRef,
     onPlayingRef,
     onPausedRef,
