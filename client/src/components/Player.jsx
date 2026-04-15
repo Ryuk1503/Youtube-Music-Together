@@ -109,7 +109,7 @@ export default function Player({
           {/* Play/Pause */}
           <button
             onClick={isPlaying ? onPause : onPlay}
-            disabled={!isHost || !currentSong}
+            disabled={isPlaying ? !currentSong : (!isHost || !currentSong)}
             className="w-11 h-11 bg-primary-600 hover:bg-primary-700 disabled:bg-dark-500 disabled:cursor-not-allowed text-white rounded-full flex items-center justify-center transition"
           >
             {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
@@ -160,7 +160,7 @@ export default function Player({
 
       {!isHost && currentSong && (
         <p className="text-xs text-dark-300 text-center mt-3">
-          Chỉ host mới có thể điều khiển phát nhạc
+          Bạn có thể tạm dừng • Chỉ host mới phát / chuyển bài
         </p>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../api';
@@ -18,6 +18,7 @@ export default function RoomListPage() {
   const { user, logout } = useAuth();
   const socket = useSocket();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [rooms, setRooms] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -27,6 +28,17 @@ export default function RoomListPage() {
   const [roomPassword, setRoomPassword] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
   const [error, setError] = useState('');
+
+  // Show error from redirect (e.g. room not found)
+  useEffect(() => {
+    if (location.state?.error) {
+      setError(location.state.error);
+      // Clear the state so it doesn't show again on refresh
+      window.history.replaceState({}, '');
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   // Fetch rooms
   const fetchRooms = async () => {
@@ -110,6 +122,15 @@ export default function RoomListPage() {
           </div>
         </div>
       </header>
+
+      {/* Error banner */}
+      {error && !showPasswordModal && (
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <main className="max-w-5xl mx-auto px-4 py-8">

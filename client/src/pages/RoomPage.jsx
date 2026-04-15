@@ -70,21 +70,6 @@ export default function RoomPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Keep audio playing when tab goes to background on mobile
-  // YouTube pauses automatically when tab is hidden — fight it by auto-resuming
-  const wasPlayingRef = useRef(false);
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && isPlaying) {
-        wasPlayingRef.current = true;
-      } else if (document.visibilityState === 'visible') {
-        wasPlayingRef.current = false;
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [isPlaying]);
-
   // Media Session API — lock screen controls & metadata
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentSong) return;
@@ -102,8 +87,7 @@ export default function RoomPage() {
     const password = location.state?.password || null;
     socket.emit('room:join', { roomId, password }, (res) => {
       if (!res.success) {
-        alert(res.error || 'Cannot join room');
-        navigate('/');
+        navigate('/', { replace: true, state: { error: res.error || 'Phòng không tồn tại hoặc đã bị xóa' } });
         return;
       }
 
@@ -167,12 +151,6 @@ export default function RoomPage() {
       }
     };
     yt.onPausedRef.current = () => {
-      // If paused because tab went hidden (browser auto-pause), auto-resume
-      if (document.visibilityState === 'hidden' && wasPlayingRef.current) {
-        setTimeout(() => yt.play(), 200);
-        return; // Don't update state or notify server
-      }
-      wasPlayingRef.current = false;
       setIsPlaying(false);
       if (isHost && socket) {
         const ct = yt.getCurrentTime();
@@ -289,7 +267,7 @@ export default function RoomPage() {
     };
   }, [socket, user]);
 
-  // Host controls
+  // Playback controls
   const handlePlay = useCallback(() => {
     if (!isHost || !socket) return;
     yt.play();
@@ -297,10 +275,12 @@ export default function RoomPage() {
   }, [isHost, socket, yt]);
 
   const handlePause = useCallback(() => {
-    if (!isHost || !socket) return;
+    if (!socket) return;
+    // Anyone can pause
+    socket.emit('player:pause', { currentTime: yt.getCurrentTime() });
     yt.pause();
-    // Server sync handled by onPausedRef callback
-  }, [isHost, socket, yt]);
+    setIsPlaying(false);
+  }, [socket, yt]);
 
   const handleSeek = useCallback(
     (time) => {

@@ -126,8 +126,8 @@ function setupSocket(io) {
 
     socket.on('player:pause', ({ currentTime }) => {
       const room = findRoomBySocket(socket.id);
-      if (!room || room.hostSocketId !== socket.id) return;
-
+      if (!room) return;
+      // Anyone can pause
       updatePlaybackState(room, { isPlaying: false, currentTime });
       socket.to(room.id).emit('player:pause', { currentTime });
     });
