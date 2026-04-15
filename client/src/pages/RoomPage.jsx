@@ -35,6 +35,7 @@ export default function RoomPage() {
   const [restricted, setRestricted] = useState([]);
   const [mobileTab, setMobileTab] = useState('player'); // 'player' | 'queue' | 'members'
   const pendingSeekRef = useRef(0); // for syncing playback position on join
+  const userActionRef = useRef(false); // prevent double-emit on user play/pause
   const desktopVideoRef = useRef(null);
   const mobileVideoRef = useRef(null);
   const ytElRef = useRef(null);
@@ -144,9 +145,19 @@ export default function RoomPage() {
   useEffect(() => {
     yt.onPlayingRef.current = () => {
       setIsPlaying(true);
+      // If not user-initiated (e.g. auto-play from loadVideoById), sync to server
+      if (!userActionRef.current && socket) {
+        socket.emit('player:play', { currentTime: yt.getCurrentTime() });
+      }
+      userActionRef.current = false;
     };
     yt.onPausedRef.current = () => {
       setIsPlaying(false);
+      // If not user-initiated (e.g. YouTube auto-pause on tab hidden), sync to server
+      if (!userActionRef.current && socket) {
+        socket.emit('player:pause', { currentTime: yt.getCurrentTime() });
+      }
+      userActionRef.current = false;
     };
     yt.onEndedRef.current = () => {
       setIsPlaying(false);
@@ -261,15 +272,15 @@ export default function RoomPage() {
   // Playback controls — anyone can play/pause
   const handlePlay = useCallback(() => {
     if (!socket) return;
-    const ct = yt.getCurrentTime();
-    socket.emit('player:play', { currentTime: ct });
+    userActionRef.current = true;
+    socket.emit('player:play', { currentTime: yt.getCurrentTime() });
     yt.play();
   }, [socket, yt]);
 
   const handlePause = useCallback(() => {
     if (!socket) return;
-    const ct = yt.getCurrentTime();
-    socket.emit('player:pause', { currentTime: ct });
+    userActionRef.current = true;
+    socket.emit('player:pause', { currentTime: yt.getCurrentTime() });
     yt.pause();
   }, [socket, yt]);
 
