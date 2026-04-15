@@ -70,33 +70,30 @@ export default function RoomPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Request Picture-in-Picture when user leaves the page/app on mobile
+  // Keep audio playing when tab goes to background on mobile
+  // YouTube pauses automatically when tab is hidden — fight it by auto-resuming
+  const wasPlayingRef = useRef(false);
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isPlaying) {
-        const iframe = yt.getIframe();
-        if (!iframe) return;
-        // Try to enter PiP via the video element inside the iframe
-        // For same-origin, we can access iframe.contentWindow.document
-        // For cross-origin (YouTube), we use requestPictureInPicture on the iframe itself (Chrome 116+)
-        if (document.pictureInPictureEnabled && iframe.requestPictureInPicture) {
-          iframe.requestPictureInPicture().catch(() => {});
-        } else if (document.pictureInPictureEnabled) {
-          // Fallback: try to get the video element
-          try {
-            const video = iframe.contentDocument?.querySelector('video');
-            if (video && !document.pictureInPictureElement) {
-              video.requestPictureInPicture().catch(() => {});
-            }
-          } catch (e) {
-            // Cross-origin, can't access — browser may handle PiP automatically
-          }
-        }
+        wasPlayingRef.current = true;
+      } else if (document.visibilityState === 'visible') {
+        wasPlayingRef.current = false;
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [isPlaying, yt]);
+  }, [isPlaying]);
+
+  // Media Session API — lock screen controls & metadata
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentSong) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.title,
+      artist: currentSong.author || '',
+      artwork: currentSong.thumbnail ? [{ src: currentSong.thumbnail, sizes: '480x360', type: 'image/jpeg' }] : [],
+    });
+  }, [currentSong?.videoId]);
 
   // Join room on mount
   useEffect(() => {
@@ -170,6 +167,12 @@ export default function RoomPage() {
       }
     };
     yt.onPausedRef.current = () => {
+      // If paused because tab went hidden (browser auto-pause), auto-resume
+      if (document.visibilityState === 'hidden' && wasPlayingRef.current) {
+        setTimeout(() => yt.play(), 200);
+        return; // Don't update state or notify server
+      }
+      wasPlayingRef.current = false;
       setIsPlaying(false);
       if (isHost && socket) {
         const ct = yt.getCurrentTime();

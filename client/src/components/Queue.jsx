@@ -12,7 +12,7 @@ export default function Queue({ queue, currentIndex, onRemove, onMove }) {
       <div className="px-4 py-3 flex items-center gap-2 border-b border-dark-500 flex-shrink-0">
         <ListMusic size={18} className="text-primary-400" />
         <h3 className="text-white font-semibold text-sm">
-          Hàng đợi ({queue.length} bài)
+          Hàng đợi ({upcoming.length} bài còn lại)
         </h3>
       </div>
 
