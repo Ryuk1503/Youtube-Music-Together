@@ -144,18 +144,9 @@ export default function RoomPage() {
   useEffect(() => {
     yt.onPlayingRef.current = () => {
       setIsPlaying(true);
-      // Host: sync actual playback state to server (covers auto-play from loadVideoById)
-      if (isHost && socket) {
-        const ct = yt.getCurrentTime();
-        socket.emit('player:play', { currentTime: ct });
-      }
     };
     yt.onPausedRef.current = () => {
       setIsPlaying(false);
-      if (isHost && socket) {
-        const ct = yt.getCurrentTime();
-        socket.emit('player:pause', { currentTime: ct });
-      }
     };
     yt.onEndedRef.current = () => {
       setIsPlaying(false);
@@ -267,19 +258,19 @@ export default function RoomPage() {
     };
   }, [socket, user]);
 
-  // Playback controls
+  // Playback controls — anyone can play/pause
   const handlePlay = useCallback(() => {
-    if (!isHost || !socket) return;
+    if (!socket) return;
+    const ct = yt.getCurrentTime();
+    socket.emit('player:play', { currentTime: ct });
     yt.play();
-    // Server sync handled by onPlayingRef callback
-  }, [isHost, socket, yt]);
+  }, [socket, yt]);
 
   const handlePause = useCallback(() => {
     if (!socket) return;
-    // Anyone can pause
-    socket.emit('player:pause', { currentTime: yt.getCurrentTime() });
+    const ct = yt.getCurrentTime();
+    socket.emit('player:pause', { currentTime: ct });
     yt.pause();
-    setIsPlaying(false);
   }, [socket, yt]);
 
   const handleSeek = useCallback(

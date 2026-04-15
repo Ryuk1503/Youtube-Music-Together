@@ -114,12 +114,12 @@ function setupSocket(io) {
       handleLeaveRoom(socket, io);
     });
 
-    // --- PLAYBACK EVENTS (Host only) ---
+    // --- PLAYBACK EVENTS ---
 
     socket.on('player:play', ({ currentTime }) => {
       const room = findRoomBySocket(socket.id);
-      if (!room || room.hostSocketId !== socket.id) return;
-
+      if (!room) return;
+      // Anyone can play/pause
       updatePlaybackState(room, { isPlaying: true, currentTime });
       socket.to(room.id).emit('player:play', { currentTime });
     });
