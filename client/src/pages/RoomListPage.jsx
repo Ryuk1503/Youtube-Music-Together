@@ -115,7 +115,7 @@ export default function RoomListPage() {
             <button
               onClick={logout}
               className="p-2 text-dark-200 hover:text-red-400 hover:bg-dark-600 rounded-lg transition"
-              title="Đăng xuất"
+              title="Đổi tên"
             >
               <LogOut size={18} />
             </button>

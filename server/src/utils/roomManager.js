@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // In-memory room storage
 const rooms = new Map();
+const EMPTY_ROOM_TTL = 10 * 60 * 1000;
 
 function createRoom({ name, password, host }) {
   const id = uuidv4().slice(0, 8);
@@ -21,6 +22,7 @@ function createRoom({ name, password, host }) {
     lastSyncedAt: Date.now(),
     messages: [], // [{ username, text, timestamp }]
     createdAt: Date.now(),
+    emptyRoomTimer: null,
   };
   rooms.set(id, room);
   return room;
@@ -48,7 +50,16 @@ function getAllRooms() {
 function joinRoom(roomId, socketId, user) {
   const room = rooms.get(roomId);
   if (!room) return null;
+  const wasEmpty = room.members.size === 0;
+  if (room.emptyRoomTimer) {
+    clearTimeout(room.emptyRoomTimer);
+    room.emptyRoomTimer = null;
+  }
   room.members.set(socketId, { userId: user.userId, username: user.username });
+  if (wasEmpty) {
+    room.hostId = user.userId;
+    room.hostSocketId = socketId;
+  }
   return room;
 }
 
@@ -58,10 +69,15 @@ function leaveRoom(roomId, socketId) {
 
   room.members.delete(socketId);
 
-  // If room is empty, delete it
+  // Keep empty rooms briefly so a refresh or reconnect can recover the room.
   if (room.members.size === 0) {
-    rooms.delete(roomId);
-    return { deleted: true, room };
+    room.emptyRoomTimer = setTimeout(() => {
+      if (room.members.size === 0 && rooms.get(roomId) === room) {
+        rooms.delete(roomId);
+      }
+      room.emptyRoomTimer = null;
+    }, EMPTY_ROOM_TTL);
+    return { deleted: false, room };
   }
 
   // If host left, transfer to first member

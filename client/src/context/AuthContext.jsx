@@ -13,12 +13,12 @@ export function AuthProvider({ children }) {
 
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
-      // Verify token is still valid
+      // Verify the guest token is still valid.
       api
-        .get('/auth/me')
+        .get('/guest/me')
         .then((res) => {
-          setUser(res.data.user);
-          localStorage.setItem('user', JSON.stringify(res.data.user));
+          setUser(res.data.guest);
+          localStorage.setItem('user', JSON.stringify(res.data.guest));
         })
         .catch(() => {
           localStorage.removeItem('token');
@@ -31,22 +31,13 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
-    const { user, token } = res.data;
+  const createGuest = async (displayName) => {
+    const res = await api.post('/guest', { displayName });
+    const { guest, token } = res.data;
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    setUser(user);
-    return user;
-  };
-
-  const register = async (username, email, password) => {
-    const res = await api.post('/auth/register', { username, email, password });
-    const { user, token } = res.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    setUser(user);
-    return user;
+    localStorage.setItem('user', JSON.stringify(guest));
+    setUser(guest);
+    return guest;
   };
 
   const logout = () => {
@@ -56,7 +47,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, createGuest, logout }}>
       {children}
     </AuthContext.Provider>
   );

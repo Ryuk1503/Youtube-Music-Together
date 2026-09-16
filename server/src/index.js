@@ -12,6 +12,7 @@ const { setupSocket } = require('./socket/handler');
 const authRoutes = require('./routes/auth');
 const roomRoutes = require('./routes/rooms');
 const youtubeRoutes = require('./routes/youtube');
+const guestRoutes = require('./routes/guest');
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +42,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/youtube', youtubeRoutes);
+app.use('/api/guest', guestRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
