@@ -104,7 +104,6 @@ export default function RoomListPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-white">YTM Together</h1>
-              <p className="text-xs text-dark-200">Nghe nhạc cùng nhau</p>
             </div>
           </div>
 
@@ -211,7 +210,6 @@ export default function RoomListPage() {
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
                   className="w-full px-4 py-2.5 bg-dark-600 border border-dark-400 rounded-lg text-white placeholder-dark-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition"
-                  placeholder="VD: Phòng nhạc của tôi"
                   autoFocus
                 />
               </div>
@@ -225,7 +223,6 @@ export default function RoomListPage() {
                   value={roomPassword}
                   onChange={(e) => setRoomPassword(e.target.value)}
                   className="w-full px-4 py-2.5 bg-dark-600 border border-dark-400 rounded-lg text-white placeholder-dark-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition"
-                  placeholder="Để trống nếu không cần"
                 />
               </div>
             </div>

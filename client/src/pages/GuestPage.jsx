@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Music, Play } from 'lucide-react';
+import { Music } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function GuestPage() {
@@ -35,7 +35,6 @@ export default function GuestPage() {
             <Music className="w-8 h-8 text-primary-400" />
           </div>
           <h1 className="text-2xl font-bold text-white">YouTube Music Together</h1>
-          <p className="text-dark-200 mt-1">Nghe nhạc cùng bạn bè</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-dark-700 rounded-2xl p-6 shadow-xl border border-dark-500">
@@ -57,7 +56,6 @@ export default function GuestPage() {
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
             className="w-full px-4 py-2.5 bg-dark-600 border border-dark-400 rounded-lg text-white placeholder-dark-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition"
-            placeholder="Ví dụ: Minh"
             maxLength={30}
             autoFocus
             required
@@ -71,10 +69,7 @@ export default function GuestPage() {
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <>
-                <Play size={18} />
-                Bắt đầu nghe nhạc
-              </>
+              'Bắt đầu nghe nhạc'
             )}
           </button>
         </form>
