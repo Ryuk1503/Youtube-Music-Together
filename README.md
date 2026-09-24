@@ -1,78 +1,54 @@
 # YouTube Music Together 🎵
 
-Nghe nhạc YouTube cùng bạn bè trong thời gian thực.
+Ứng dụng nghe nhạc YouTube cùng bạn bè theo phòng, đồng bộ theo thời gian thực.
 
 ## Tính năng
 
-- **Đăng ký / Đăng nhập** với JWT
-- **Tạo & tham gia phòng** (có/không mật khẩu)
-- **Tìm kiếm nhạc** từ YouTube (ưu tiên khu vực VN)
-- **Player đồng bộ** - Play, Pause, Seek, Next đồng bộ giữa tất cả thành viên
-- **Hàng đợi (Queue)** - Thêm/xóa bài hát
-- **Chat** trong phòng
-- **Phân quyền Host** - Chỉ host mới điều khiển playback
+- Đăng ký bằng tên và mật khẩu, tạo/tham gia phòng có hoặc không có mật khẩu.
+- Bấm tên → Hồ sơ để sửa tên dùng đăng nhập, ảnh, tiểu sử và mật khẩu; ID riêng không đổi khi đổi tên. Tài khoản và hồ sơ lưu trong PostgreSQL.
+- Tìm nhạc, quản lý hàng đợi, tự đề xuất bài tiếp theo; host điều khiển phát/dừng/tua/chuyển bài.
+- Chat trong phòng, trả lời tin nhắn kèm trích dẫn.
+- Shop và Túi đồ: mua Thẻ đổi ID (30 Notes), dùng một thẻ để đổi ID; không đổi tên đăng nhập.
+- Nghe nền trên Android và tiếp tục nghe khi quay về trang chủ.
+- Thống kê thời gian nghe, xếp hạng nghệ sĩ, tổng kết phiên và lưu lịch sử nhạc chung.
 
-## Tech Stack
+Nghe đủ 600 giây nhận 1 Note, không giới hạn mỗi ngày. Thời gian tính riêng từng tài khoản khi bộ đếm phòng chạy, giữ phần dư khi đổi phòng và không cộng trùng nhiều tab/phòng.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React + Vite + TailwindCSS + Lucide Icons |
-| Backend | Node.js + Express + Socket.IO |
-| Database | PostgreSQL |
-| YouTube | ytsr (search) + @distube/ytdl-core (audio) |
+## Công nghệ
 
-## Cài đặt
+- `client/`: React, Vite, TailwindCSS, Socket.IO Client.
+- `server/`: Node.js, Express, Socket.IO, PostgreSQL.
+- Phát nhạc thông qua YouTube IFrame Player (chạy ẩn trong DOM, hiển thị ảnh thu nhỏ và giao diện tùy chỉnh).
 
-### 1. Yêu cầu
-- Node.js >= 18
-- PostgreSQL
+## Chạy local
 
-### 2. Database
-Tạo database PostgreSQL:
-```sql
-CREATE DATABASE ytm_together;
+Cần Node.js ≥ 22.12 và PostgreSQL có chứng chỉ TLS hợp lệ.
+
+Tạo database và cấu hình `server/.env`:
+
+```dotenv
+DATABASE_URL=postgresql://user:password@host:5432/ytm_together
+JWT_SECRET=thay-bang-chuoi-bi-mat
+PORT=3001
+APP_URL=http://localhost:5173
 ```
 
-### 3. Backend
+Chạy backend và frontend trong hai terminal riêng:
+
 ```bash
 cd server
 npm install
-# Chỉnh sửa file .env nếu cần
 npm run dev
 ```
 
-Server chạy tại: `http://localhost:3001`
-
-### 4. Frontend
 ```bash
 cd client
 npm install
 npm run dev
 ```
 
-Client chạy tại: `http://localhost:5173`
+Mở `http://localhost:5173`; backend chạy tại `http://localhost:3001`. Các bảng dữ liệu được khởi tạo khi backend khởi động.
 
-## Cấu trúc thư mục
+Chi tiết: [phát nhạc nền và triển khai](NATIVE_AUDIO.md), [lịch sử nhạc](MUSIC_HISTORY.md). Dữ liệu cho trò đoán bài hát đã được chuẩn bị; trò chơi chưa triển khai.
 
-```
-├── server/
-│   ├── src/
-│   │   ├── index.js           # Entry point
-│   │   ├── config/db.js       # PostgreSQL connection
-│   │   ├── middleware/auth.js  # JWT middleware
-│   │   ├── routes/
-│   │   │   ├── auth.js        # Register/Login API
-│   │   │   ├── rooms.js       # Room listing API
-│   │   │   └── youtube.js     # Search + Audio stream
-│   │   ├── socket/handler.js  # Socket.IO events
-│   │   └── utils/roomManager.js
-│   └── .env
-├── client/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── context/           # Auth + Socket providers
-│   │   ├── pages/             # Login, Register, RoomList, Room
-│   │   └── components/        # Player, Search, Queue, Chat
-│   └── index.html
-└── README.md
-```
+Phiên đăng nhập dùng cookie HttpOnly (Secure khi `NODE_ENV=production`). Đánh giá bảo mật và các giới hạn còn lại: [SECURITY_REVIEW.md](SECURITY_REVIEW.md).

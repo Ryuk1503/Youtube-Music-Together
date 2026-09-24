@@ -1,6 +1,16 @@
 import { X, Crown, User, Ban, ShieldOff, ArrowRightLeft, UserX } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import MemberProfileCard from './MemberProfileCard';
 
-export default function MemberList({ members, hostId, restricted, isHost, currentUserId, onKick, onRestrict, onTransferHost, onClose, inline }) {
+export default function MemberList({ roomId, members, hostId, restricted, isHost, currentUserId, onKick, onRestrict, onTransferHost, onClose, inline }) {
+  const [selected, setSelected] = useState(null);
+  const closeTimer = useRef(null);
+  const closeProfile = useCallback(() => { clearTimeout(closeTimer.current); setSelected(null); }, []);
+  const keepProfile = () => clearTimeout(closeTimer.current);
+  const deferClose = () => { clearTimeout(closeTimer.current); closeTimer.current = setTimeout(() => setSelected(null), 180); };
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+  useEffect(() => { if (selected && !members.some(member => member.userId === selected.member.userId)) closeProfile(); }, [members, selected, closeProfile]);
+  const openProfile = (member, element, modal) => { keepProfile(); setSelected({ member, anchor: element.getBoundingClientRect(), modal }); };
   const content = (
     <>
       <div className="flex items-center justify-between px-4 py-4 border-b border-dark-500 flex-shrink-0">
@@ -26,6 +36,11 @@ export default function MemberList({ members, hostId, restricted, isHost, curren
               key={member.userId}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-dark-600 group transition"
             >
+              <button type="button" aria-label={`Xem hồ sơ ${member.username}`} className="flex min-w-0 flex-1 items-center gap-3 text-left rounded-lg focus-visible:outline focus-visible:outline-primary-400"
+                onPointerEnter={event => { if (event.pointerType === 'mouse' && window.matchMedia('(hover: hover)').matches) openProfile(member, event.currentTarget, false); }}
+                onPointerLeave={() => { if (!selected?.modal) deferClose(); }}
+                onClick={event => openProfile(member, event.currentTarget, !window.matchMedia('(hover: hover) and (pointer: fine)').matches)}
+                onKeyDown={event => { if (event.key === 'Escape') closeProfile(); }}>
               <div className="w-8 h-8 bg-primary-600/20 rounded-full flex items-center justify-center flex-shrink-0">
                 <User size={16} className="text-primary-400" />
               </div>
@@ -38,6 +53,8 @@ export default function MemberList({ members, hostId, restricted, isHost, curren
                   {isMemberRestricted && <Ban size={12} className="text-red-400 flex-shrink-0" />}
                 </div>
               </div>
+
+              </button>
 
               {isHost && !isSelf && !isMemberHost && (
                 <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
@@ -72,6 +89,7 @@ export default function MemberList({ members, hostId, restricted, isHost, curren
           );
         })}
       </div>
+      {selected && <MemberProfileCard {...selected} roomId={roomId} onClose={closeProfile} onEnter={keepProfile} onLeave={deferClose} />}
     </>
   );
 

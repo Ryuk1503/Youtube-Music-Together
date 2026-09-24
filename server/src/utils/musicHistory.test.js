@@ -1,0 +1,20 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { createHistoryRecorder } = require('./musicHistory');
+const tick = () => new Promise(resolve => setImmediate(resolve));
+test('history stores anonymous global plays, ignores impossible progress and survives reconnect', async () => {
+  const writes = []; let time = 0;
+  const record = createHistoryRecorder(async entry => writes.push(entry), () => time);
+  const room = { sessionId: 'session', currentIndex: 0, queue: [{ videoId: 'aaaaaaaaaaa', title: 'Song' }] };
+  const user = { userId: 'actual', username: 'Listener' };
+  const payload = { videoId: 'aaaaaaaaaaa', playbackId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', listenedMs: 0, duration: 180, listenerId: 'forged' };
+  record(room, user, payload); await tick();
+  assert.equal(writes[0].listenerId, undefined);
+  assert.equal(writes[0].username, undefined);
+  record(room, user, { ...payload, listenedMs: 60000 }); await tick();
+  assert.equal(writes.length, 1);
+  time = 30000; record(room, { ...user }, { ...payload, listenedMs: 30000 }); await tick();
+  assert.equal(writes.at(-1).listenedMs, 30000);
+  record(room, user, { ...payload, videoId: 'bbbbbbbbbbb' }); await tick();
+  assert.equal(writes.length, 2);
+});

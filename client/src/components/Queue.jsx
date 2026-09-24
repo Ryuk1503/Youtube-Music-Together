@@ -1,20 +1,28 @@
-import { useState } from 'react';
-import { ListMusic, X, Music, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
+import { ListMusic, X, Music, ChevronUp, ChevronDown, Shuffle, Loader2 } from 'lucide-react';
 
-export default function Queue({ queue, currentIndex, onRemove, onMove }) {
-  const [showPlayed, setShowPlayed] = useState(false);
+export default function Queue({ queue, currentIndex, onRemove, onMove, onAutoAdd, autoAdding, autoAddError, canAutoAdd }) {
   const upcoming = queue.slice(currentIndex + 1);
-  const played = currentIndex > 0 ? queue.slice(0, currentIndex) : [];
   const currentSong = currentIndex >= 0 ? queue[currentIndex] : null;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-4 py-3 flex items-center gap-2 border-b border-dark-500 flex-shrink-0">
+      <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-b border-dark-500 flex-shrink-0">
         <ListMusic size={18} className="text-primary-400" />
         <h3 className="text-white font-semibold text-sm">
           Hàng đợi ({upcoming.length} bài còn lại)
         </h3>
+        <button
+          onClick={onAutoAdd}
+          disabled={!currentSong || !canAutoAdd || autoAdding}
+          className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-primary-300 bg-primary-600/15 hover:bg-primary-600/25 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          title={!currentSong ? 'Chọn bài đầu tiên để lấy đề xuất' : 'Thêm một bài ngẫu nhiên từ YouTube đề xuất'}
+          aria-busy={autoAdding}
+        >
+          {autoAdding ? <Loader2 size={14} className="animate-spin" /> : <Shuffle size={14} />}
+          Tự động thêm
+        </button>
       </div>
+      {autoAddError && <p role="status" className="px-4 pt-2 text-xs text-red-400">{autoAddError}</p>}
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {queue.length === 0 ? (
@@ -104,46 +112,7 @@ export default function Queue({ queue, currentIndex, onRemove, onMove }) {
               </div>
             )}
 
-            {/* Played songs (collapsible) */}
-            {played.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setShowPlayed(!showPlayed)}
-                  className="flex items-center gap-1.5 text-xs text-dark-300 uppercase font-semibold tracking-wider mb-2 hover:text-dark-100 transition"
-                >
-                  <ChevronRight
-                    size={14}
-                    className={`transition-transform ${showPlayed ? 'rotate-90' : ''}`}
-                  />
-                  Đã phát ({played.length})
-                </button>
-                {showPlayed && (
-                  <div className="space-y-1">
-                    {played.map((song, i) => (
-                      <div
-                        key={`${song.videoId}-played-${i}`}
-                        className="flex items-center gap-3 p-2 rounded-lg opacity-50"
-                      >
-                        <span className="w-5 text-xs text-dark-400 text-center flex-shrink-0">
-                          {i + 1}
-                        </span>
-                        <img
-                          src={song.thumbnail}
-                          alt=""
-                          className="w-10 h-7 rounded object-cover flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-dark-200 truncate">{song.title}</p>
-                          <p className="text-xs text-dark-400 truncate">
-                            {song.author} • {song.addedBy}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+
           </div>
         )}
       </div>

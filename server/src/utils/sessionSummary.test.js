@@ -1,0 +1,24 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { buildSessionSummary } = require('./sessionSummary');
+const { createRoom, deleteRoom, joinRoom, addToQueue, updatePlaybackState, nextSong } = require('./roomManager');
+test('summary measures artist time and counts only manual additions, preserving ties', t => {
+  let now = 1000;
+  t.mock.method(Date, 'now', () => now);
+  const room = createRoom({name:'Test',host:{userId:1}});
+  t.after(()=>deleteRoom(room.id));
+  joinRoom(room.id,'a',{userId:1});
+  addToQueue(room,{author:'Artist A',addedBy:'One'},1);
+  addToQueue(room,{author:'Artist B',addedBy:'Two'},2);
+  addToQueue(room,{author:'Artist B',addedBy:'Two',recommended:true},2);
+  updatePlaybackState(room,{isPlaying:true});
+  now+=5000;
+  nextSong(room);
+  now+=3000;
+  updatePlaybackState(room,{isPlaying:false});
+  now+=20000;
+  const summary=buildSessionSummary(room);
+  assert.equal(summary.elapsedMs,8000);
+  assert.deepEqual(summary.topArtists,[{name:'Artist A',elapsedMs:5000}]);
+  assert.deepEqual(summary.topMembers,[{name:'One',count:1},{name:'Two',count:1}]);
+});

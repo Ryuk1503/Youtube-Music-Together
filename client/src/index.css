@@ -67,3 +67,13 @@ input[type='range']::-moz-range-thumb {
   cursor: pointer;
   border: none;
 }
+
+/* Floating toolbar on desktop, in-flow controls on touch screens. */
+@media (hover: hover) and (pointer: fine) {
+  .chat-actions { opacity: 0; pointer-events: none; transition: opacity 150ms; }
+  .chat-message:hover > .chat-actions, .chat-message:focus-within > .chat-actions { opacity: 1; pointer-events: auto; }
+  .chat-message:hover, .chat-message:focus-within { z-index: 20; }
+}
+@media (hover: none), (pointer: coarse) {
+  .chat-actions { position: static; width: max-content; margin-left: auto; margin-bottom: 2px; }
+}

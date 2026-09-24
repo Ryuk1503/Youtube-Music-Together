@@ -1,35 +1,19 @@
 const express = require('express');
-const ytsr = require('ytsr');
+const { searchYouTube } = require('../utils/youtubeSearch');
 
 const router = express.Router();
 
 // GET /api/youtube/search?q=query
 router.get('/search', async (req, res) => {
   try {
-    const { q } = req.query;
-    if (!q) return res.status(400).json({ error: 'Query is required' });
-
-    const results = await ytsr(q, {
-      limit: 20,
-      gl: 'VN',
-      hl: 'vi',
-    });
-
-    const videos = results.items
-      .filter((item) => item.type === 'video')
-      .map((item) => ({
-        videoId: item.id,
-        title: item.title,
-        thumbnail: item.bestThumbnail?.url || item.thumbnails?.[0]?.url || '',
-        duration: item.duration,
-        author: item.author?.name || 'Unknown',
-        views: item.views,
-      }));
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (!q || q.length > 200) return res.status(400).json({ error: 'Từ khóa phải dài từ 1 đến 200 ký tự.' });
+    const videos = await searchYouTube(q);
 
     res.json({ videos });
   } catch (err) {
-    console.error('Search error:', err);
-    res.status(500).json({ error: 'Failed to search' });
+    console.error('Search error:', err.message);
+    res.status(502).json({ error: 'Chưa lấy được kết quả từ YouTube. Vui lòng thử lại.' });
   }
 });
 

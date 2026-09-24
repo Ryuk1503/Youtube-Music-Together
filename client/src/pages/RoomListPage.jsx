@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import SiteHeader from '../components/SiteHeader';
 import { useSocket } from '../context/SocketContext';
 import api from '../api';
+import ArtistLeaderboard from '../components/ArtistLeaderboard';
 import {
-  Music,
   Plus,
-  LogOut,
   Users,
   Lock,
   Unlock,
@@ -14,8 +13,7 @@ import {
   DoorOpen,
 } from 'lucide-react';
 
-export default function RoomListPage() {
-  const { user, logout } = useAuth();
+export default function RoomListPage({ activeRoomLocation }) {
   const socket = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,6 +26,7 @@ export default function RoomListPage() {
   const [roomPassword, setRoomPassword] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
   const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   // Show error from redirect (e.g. room not found)
   useEffect(() => {
@@ -63,20 +62,32 @@ export default function RoomListPage() {
 
   // Create room
   const handleCreateRoom = () => {
-    if (!socket || !roomName.trim()) return;
+    if (!roomName.trim() || creating) return;
+    if (!socket?.connected) {
+      setError('Chưa kết nối được với phòng nhạc. Vui lòng thử lại sau ít giây.');
+      socket?.connect();
+      return;
+    }
+    setCreating(true); setError('');
 
-    socket.emit('room:create', { name: roomName.trim(), password: roomPassword || null }, (res) => {
+    socket.timeout(10000).emit('room:create', { name: roomName.trim(), password: roomPassword || null }, (err,res) => {
+      setCreating(false);
+      if (err || !res?.success) { setError(res?.error || 'Tạo phòng chưa thành công. Vui lòng thử lại.'); return; }
       if (res.success) {
         setShowCreateModal(false);
         setRoomName('');
         setRoomPassword('');
-        navigate(`/room/${res.room.id}`);
+        navigate(`/room/${res.room.id}`, { state: { password: roomPassword || null } });
       }
     });
   };
 
   // Join room
   const handleJoinRoom = (room) => {
+    if (activeRoomLocation?.pathname === `/room/${room.id}`) {
+      navigate(activeRoomLocation.pathname, { state: activeRoomLocation.state });
+      return;
+    }
     if (room.hasPassword) {
       setSelectedRoom(room);
       setJoinPassword('');
@@ -96,31 +107,7 @@ export default function RoomListPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header */}
-      <header className="bg-dark-800 border-b border-dark-500">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600/20 rounded-xl flex items-center justify-center">
-              <Music className="w-5 h-5 text-primary-400" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">YTM Together</h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-dark-100">
-              Xin chào, <span className="text-white font-medium">{user?.username}</span>
-            </span>
-            <button
-              onClick={logout}
-              className="p-2 text-dark-200 hover:text-red-400 hover:bg-dark-600 rounded-lg transition"
-              title="Đổi tên"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Error banner */}
       {error && !showPasswordModal && (
@@ -194,13 +181,18 @@ export default function RoomListPage() {
             ))}
           </div>
         )}
+        <div className="mt-8">
+          <hr className="border-0 border-t border-white/20 mb-8" />
+          <ArtistLeaderboard socket={socket} />
+        </div>
       </main>
 
       {/* Create Room Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-dark-700 border border-dark-500 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-xl font-semibold text-white mb-4">Tạo phòng mới</h3>
+            <h3 className="text-xl font-semibold text-white text-center mb-4">Tạo phòng mới</h3>
+            {error && <p role="alert" className="mb-4 text-sm text-red-400">{error}</p>}
 
             <div className="space-y-4">
               <div>
@@ -236,7 +228,7 @@ export default function RoomListPage() {
               </button>
               <button
                 onClick={handleCreateRoom}
-                disabled={!roomName.trim()}
+                disabled={!roomName.trim() || creating}
                 className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium rounded-lg transition"
               >
                 Tạo phòng

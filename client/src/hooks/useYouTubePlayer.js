@@ -1,17 +1,50 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createListeningProgress } from '../listeningProgress';
 
-const CONTAINER_ID = 'yt-player';
+const CONTAINER_ID = 'yt-player-persistent';
 
 export default function useYouTubePlayer() {
   const playerRef = useRef(null);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
+  const currentVideoIdRef = useRef(null);
+  const desiredPlayingRef = useRef(false);
+  const pendingLoadRef = useRef(null);
+
   const onEndedRef = useRef(null);
   const onPlayingRef = useRef(null);
   const onPausedRef = useRef(null);
   const onErrorRef = useRef(null);
+  const onProgressRef = useRef(null);
+
+  const history = useRef(null);
+  if (!history.current) {
+    history.current = createListeningProgress(payload => onProgressRef.current?.(payload));
+  }
 
   useEffect(() => {
     let destroyed = false;
+
+    // Ensure hidden persistent container on body
+    let container = document.getElementById(CONTAINER_ID);
+    if (!container) {
+      container = document.createElement('div');
+      container.id = CONTAINER_ID;
+      Object.assign(container.style, {
+        position: 'fixed',
+        bottom: '0px',
+        right: '0px',
+        width: '200px',
+        height: '200px',
+        opacity: '0.001',
+        pointerEvents: 'none',
+        zIndex: '-9999',
+      });
+      const innerDiv = document.createElement('div');
+      innerDiv.id = 'yt-player-iframe-slot';
+      container.appendChild(innerDiv);
+      document.body.appendChild(container);
+    }
 
     // Load YouTube IFrame API script once
     if (!document.getElementById('yt-iframe-api')) {
@@ -21,18 +54,14 @@ export default function useYouTubePlayer() {
       document.head.appendChild(tag);
     }
 
-    const createPlayer = () => {
-      if (destroyed || playerRef.current) return;
-      const el = document.getElementById(CONTAINER_ID);
-      if (!el) {
-        // DOM not ready, retry next frame
-        requestAnimationFrame(createPlayer);
-        return;
-      }
+    const initPlayer = () => {
+      if (destroyed || playerRef.current || !window.YT?.Player) return;
+      const slot = document.getElementById('yt-player-iframe-slot');
+      if (!slot) return;
 
-      playerRef.current = new window.YT.Player(CONTAINER_ID, {
-        height: '100%',
-        width: '100%',
+      playerRef.current = new window.YT.Player('yt-player-iframe-slot', {
+        height: '200',
+        width: '200',
         playerVars: {
           autoplay: 0,
           controls: 0,
@@ -46,25 +75,36 @@ export default function useYouTubePlayer() {
         },
         events: {
           onReady: (event) => {
-            // Enable PiP and autoplay on the iframe
-            const iframe = event.target.getIframe();
-            if (iframe) {
-              iframe.setAttribute('allow', 'autoplay; picture-in-picture; encrypted-media');
-              iframe.setAttribute('allowfullscreen', '');
-            }
+            if (destroyed) return;
             setReady(true);
+            if (pendingLoadRef.current) {
+              const { id, seconds, playing } = pendingLoadRef.current;
+              pendingLoadRef.current = null;
+              loadVideo(id, seconds, playing);
+            }
           },
           onStateChange: (event) => {
+            if (destroyed) return;
             if (event.data === window.YT.PlayerState.PLAYING) {
+              setError('');
               onPlayingRef.current?.();
             } else if (event.data === window.YT.PlayerState.PAUSED) {
               onPausedRef.current?.();
             } else if (event.data === window.YT.PlayerState.ENDED) {
+              const ct = playerRef.current?.getCurrentTime?.() || 0;
+              const dur = playerRef.current?.getDuration?.() || 0;
+              history.current?.finish({ currentTime: ct, duration: dur, paused: true });
               onEndedRef.current?.();
             }
           },
           onError: (event) => {
+            if (destroyed) return;
             console.error('YT Player error code:', event.data);
+            if (event.data === 101 || event.data === 150) {
+              setError('Video này chặn phát qua trình nhúng hoặc yêu cầu bản quyền.');
+            } else {
+              setError('Không thể phát video này từ YouTube.');
+            }
             onErrorRef.current?.(event.data);
           },
         },
@@ -72,41 +112,85 @@ export default function useYouTubePlayer() {
     };
 
     if (window.YT && window.YT.Player) {
-      requestAnimationFrame(createPlayer);
+      initPlayer();
     } else {
       const prev = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
         prev?.();
-        createPlayer();
+        initPlayer();
       };
     }
 
+    // Interval to track listening progress
+    const progressInterval = setInterval(() => {
+      if (!playerRef.current?.getCurrentTime) return;
+      const state = playerRef.current.getPlayerState?.();
+      const ct = playerRef.current.getCurrentTime() || 0;
+      const dur = playerRef.current.getDuration() || 0;
+      const isPlaying = state === window.YT?.PlayerState?.PLAYING;
+      history.current?.sample({
+        currentTime: ct,
+        duration: dur,
+        paused: !isPlaying,
+        seeking: false,
+      });
+    }, 1000);
+
     return () => {
       destroyed = true;
-      if (playerRef.current && playerRef.current.destroy) {
+      clearInterval(progressInterval);
+      if (playerRef.current?.destroy) {
         playerRef.current.destroy();
         playerRef.current = null;
       }
+      const el = document.getElementById(CONTAINER_ID);
+      if (el?.parentNode) el.parentNode.removeChild(el);
     };
   }, []);
 
-  const loadVideo = useCallback((videoId, startSeconds = 0) => {
-    if (playerRef.current?.loadVideoById) {
-      playerRef.current.loadVideoById({ videoId, startSeconds });
+  const loadVideo = useCallback((id, startSeconds = 0, playing = true, { preservePosition = false } = {}) => {
+    desiredPlayingRef.current = playing;
+    if (!playerRef.current?.loadVideoById) {
+      pendingLoadRef.current = { id, seconds: startSeconds, playing };
+      return;
     }
-  }, []);
 
-  const cueVideo = useCallback((videoId) => {
-    if (playerRef.current?.cueVideoById) {
-      playerRef.current.cueVideoById(videoId);
+    if (currentVideoIdRef.current === id) {
+      if (!preservePosition) {
+        playerRef.current.seekTo?.(startSeconds, true);
+      }
+      if (playing) {
+        playerRef.current.playVideo?.();
+      } else {
+        playerRef.current.pauseVideo?.();
+      }
+      return;
+    }
+
+    currentVideoIdRef.current = id;
+    setError('');
+    history.current?.begin(id);
+
+    if (playing) {
+      playerRef.current.loadVideoById({
+        videoId: id,
+        startSeconds: Math.max(0, Math.floor(startSeconds)),
+      });
+    } else {
+      playerRef.current.cueVideoById({
+        videoId: id,
+        startSeconds: Math.max(0, Math.floor(startSeconds)),
+      });
     }
   }, []);
 
   const play = useCallback(() => {
+    desiredPlayingRef.current = true;
     playerRef.current?.playVideo?.();
   }, []);
 
   const pause = useCallback(() => {
+    desiredPlayingRef.current = false;
     playerRef.current?.pauseVideo?.();
   }, []);
 
@@ -115,7 +199,14 @@ export default function useYouTubePlayer() {
   }, []);
 
   const setVolume = useCallback((vol) => {
-    playerRef.current?.setVolume?.(vol * 100);
+    const p = playerRef.current;
+    if (!p) return;
+    if (vol <= 0) {
+      p.mute?.();
+    } else {
+      p.unMute?.();
+      p.setVolume?.(Math.round(vol * 100));
+    }
   }, []);
 
   const getCurrentTime = useCallback(() => {
@@ -126,25 +217,21 @@ export default function useYouTubePlayer() {
     return playerRef.current?.getDuration?.() || 0;
   }, []);
 
-  const getIframe = useCallback(() => {
-    return playerRef.current?.getIframe?.() || null;
-  }, []);
-
   return {
     ready,
+    error,
+    retryWait: 0,
     loadVideo,
-    cueVideo,
     play,
     pause,
     seekTo,
     setVolume,
     getCurrentTime,
     getDuration,
-    getIframe,
     onEndedRef,
     onPlayingRef,
     onPausedRef,
     onErrorRef,
-    CONTAINER_ID,
+    onProgressRef,
   };
 }

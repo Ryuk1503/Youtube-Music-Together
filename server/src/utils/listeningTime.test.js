@@ -1,0 +1,38 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { createRoom, joinRoom, leaveRoom, deleteRoom, addToQueue, updatePlaybackState, nextSong, getPlaybackState } = require('./roomManager');
+
+test('counts shared playback, excludes pauses and empty rooms, survives rejoin and seeking', t => {
+  t.mock.method(Date, 'now', () => now);
+  let now = 1000;
+  const room = createRoom({ name: 'Timer', host: { userId: '1', socketId: 'a' } });
+  t.after(() => deleteRoom(room.id));
+  joinRoom(room.id, 'a', { userId: '1' });
+  addToQueue(room, { videoId: 'aaaaaaaaaaa' });
+  now += 10000;
+  assert.equal(getPlaybackState(room).listeningTime.elapsedMs, 0);
+  updatePlaybackState(room, { isPlaying: true, currentTime: 0 });
+  now += 5000;
+  joinRoom(room.id, 'b', { userId: '2' });
+  now += 5000;
+  updatePlaybackState(room, { currentTime: 200 });
+  assert.equal(getPlaybackState(room).listeningTime.elapsedMs, 10000);
+  updatePlaybackState(room, { isPlaying: false });
+  now += 20000;
+  assert.equal(getPlaybackState(room).listeningTime.elapsedMs, 10000);
+  updatePlaybackState(room, { isPlaying: true });
+  now += 3000;
+  leaveRoom(room.id, 'a');
+  leaveRoom(room.id, 'b');
+  now += 20000;
+  joinRoom(room.id, 'c', { userId: '1' });
+  assert.equal(getPlaybackState(room).listeningTime.elapsedMs, 13000);
+  now += 2000;
+  addToQueue(room, { videoId: 'bbbbbbbbbbb' });
+  nextSong(room);
+  assert.equal(getPlaybackState(room).listeningTime.elapsedMs, 15000);
+  now += 4000;
+  nextSong(room);
+  now += 10000;
+  assert.deepEqual(getPlaybackState(room).listeningTime, { elapsedMs: 19000, running: false });
+});

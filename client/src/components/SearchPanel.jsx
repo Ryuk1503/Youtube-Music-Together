@@ -7,19 +7,22 @@ export default function SearchPanel({ onAddToQueue }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSearch = async (e) => {
     e?.preventDefault();
     if (!query.trim()) return;
 
     setLoading(true);
+    setError('');
     setHasSearched(true);
     try {
       const res = await api.get('/youtube/search', { params: { q: query.trim() } });
-      setResults(res.data.videos || []);
+      setResults((res.data.videos || []).slice(0, 10));
     } catch (err) {
       console.error('Search failed:', err);
       setResults([]);
+      setError(err.response?.data?.error || 'Không thể tìm kiếm lúc này. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -29,6 +32,7 @@ export default function SearchPanel({ onAddToQueue }) {
     setQuery('');
     setResults([]);
     setHasSearched(false);
+    setError('');
   };
 
   const handleAdd = (video) => {
@@ -83,7 +87,8 @@ export default function SearchPanel({ onAddToQueue }) {
           </div>
         )}
 
-        {!loading && hasSearched && results.length === 0 && (
+        {!loading && error && <p role="status" className="text-red-400 text-sm text-center py-8">{error}</p>}
+        {!loading && !error && hasSearched && results.length === 0 && (
           <p className="text-dark-300 text-sm text-center py-8">Không tìm thấy kết quả</p>
         )}
 

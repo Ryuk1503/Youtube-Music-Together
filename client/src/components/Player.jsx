@@ -2,7 +2,7 @@ import {
   Play,
   Pause,
   SkipForward,
-  Repeat,
+  Radio,
   Volume2,
   VolumeX,
   Music,
@@ -22,13 +22,17 @@ export default function Player({
   duration,
   volume,
   isHost,
-  repeat,
+  autoplay,
+  autoplayLoading,
+  autoplayError,
+  playbackError,
+  retryWait,
   onPlay,
   onPause,
   onSeek,
   onNext,
   onVolumeChange,
-  onToggleRepeat,
+  onToggleAutoplay,
   children,
 }) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -48,9 +52,9 @@ export default function Player({
   };
 
   return (
-    <div className="p-5 flex-shrink-0">
+    <div className="px-4 pt-6 pb-4 flex-shrink-0">
       {/* YouTube Player / Thumbnail area */}
-      <div className="relative aspect-video bg-dark-600 rounded-xl overflow-hidden mb-4">
+      <div className="relative mx-auto aspect-video max-h-40 bg-dark-600 rounded-xl overflow-hidden mb-5">
         {children}
 
         {!currentSong && (
@@ -74,17 +78,17 @@ export default function Player({
       </div>
 
       {/* Song info */}
-      <div className="mb-4">
+      <div className="mb-2 min-h-[44px]">
         <h3 className="text-white font-semibold text-base truncate">
-          {currentSong?.title || 'Chọn bài hát để phát'}
+          {currentSong?.title || ''}
         </h3>
         <p className="text-dark-200 text-sm truncate">
-          {currentSong?.author || 'Tìm kiếm và thêm bài hát vào queue'}
+          {currentSong?.author || ''}
         </p>
       </div>
 
       {/* Seek bar */}
-      <div className="mb-4">
+      <div className="mb-3">
         <input
           type="range"
           min="0"
@@ -103,6 +107,18 @@ export default function Player({
         </div>
       </div>
 
+      {(autoplayLoading || autoplayError) && (
+        <p role="status" className="text-xs text-dark-200 mb-3">
+          {autoplayLoading ? 'Đang tìm bài YouTube đề xuất…' : autoplayError}
+        </p>
+      )}
+      {retryWait > 0 ? (
+        <p role="status" className="text-sm text-red-400 mb-3">
+          Nguồn nhạc đang bận. Sẽ thử lại sau {retryWait} giây...
+        </p>
+      ) : playbackError ? (
+        <p role="alert" className="text-sm text-red-400 mb-3">{playbackError}</p>
+      ) : null}
       {/* Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -119,23 +135,27 @@ export default function Player({
           <button
             onClick={onNext}
             disabled={!isHost || !currentSong}
+            aria-label="Bài tiếp theo"
+            title={!isHost ? 'Chỉ chủ phòng có thể chuyển bài' : 'Bài tiếp theo'}
             className="w-9 h-9 text-dark-100 hover:text-white disabled:text-dark-400 disabled:cursor-not-allowed hover:bg-dark-600 rounded-full flex items-center justify-center transition"
           >
             <SkipForward size={18} />
           </button>
 
-          {/* Repeat */}
+          {/* Radio */}
           <button
-            onClick={onToggleRepeat}
+            onClick={onToggleAutoplay}
             disabled={!isHost}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition disabled:cursor-not-allowed ${
-              repeat
+              autoplay
                 ? 'text-primary-400 bg-primary-400/10 hover:bg-primary-400/20'
                 : 'text-dark-100 hover:text-white hover:bg-dark-600 disabled:text-dark-400'
             }`}
-            title={repeat ? 'Tắt lặp lại' : 'Bật lặp lại'}
+            aria-pressed={autoplay}
+            aria-label="Tự động phát bài YouTube đề xuất"
+            title={autoplay ? 'Tắt tự động phát' : 'Bật tự động phát'}
           >
-            <Repeat size={16} />
+            <Radio size={16} />
           </button>
         </div>
 

@@ -3,27 +3,33 @@ require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000,
+  ssl: { rejectUnauthorized: true },
 });
 
 const initDB = async () => {
   let client;
   try {
     client = await pool.connect();
+    await require('../utils/accounts').initAccounts(client);
     await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        avatar_url VARCHAR(500),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      CREATE TABLE IF NOT EXISTS listening_sessions (
+        id UUID PRIMARY KEY,
+        ended_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS session_artist_listening (
+        session_id UUID NOT NULL REFERENCES listening_sessions(id) ON DELETE CASCADE,
+        artist_key TEXT NOT NULL,
+        artist_name TEXT NOT NULL,
+        elapsed_ms BIGINT NOT NULL CHECK (elapsed_ms > 0),
+        PRIMARY KEY (session_id, artist_key)
       );
     `);
-    console.log('✅ Database connected (PostgreSQL)');
+    await require('../utils/musicHistory').initMusicHistory(client);
+    await require('../utils/roomHistory').initRoomHistory(client);
   } catch (err) {
     console.error('❌ Database initialization failed:', err.message);
-    console.error('⚠️  Server will start but auth features require a working database.');
+    throw err;
   } finally {
     if (client) client.release();
   }

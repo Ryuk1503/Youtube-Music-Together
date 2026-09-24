@@ -1,0 +1,9 @@
+{
+  "appId": "com.ytmtogether.app",
+  "appName": "YTM Together",
+  "webDir": "../server/public",
+  "server": {
+    "url": "https://r1u205.alwaysdata.net",
+    "cleartext": true
+  }
+}
