@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Mail, X, Calendar, ArrowLeft } from 'lucide-react';
+import { Mail, X, Calendar, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '../api';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
 
 function formatTime(iso) {
   if (!iso) return '';
@@ -17,11 +18,13 @@ function formatTime(iso) {
 
 export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
   const socket = useSocket();
+  const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mobileView, setMobileView] = useState('list'); // 'list' | 'detail'
+  const [mobileActiveId, setMobileActiveId] = useState(null);
 
   // Fetch announcements when opened
   useEffect(() => {
@@ -30,7 +33,13 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
     setError('');
     api.get('/announcements')
       .then(({ data }) => {
-        const list = data.announcements || [];
+        let list = data.announcements || [];
+        if (!user?.isAdmin) {
+          try {
+            const dismissed = JSON.parse(localStorage.getItem('ytm_dismissed_announcements') || '[]');
+            list = list.filter(a => !dismissed.includes(a.id));
+          } catch (e) {}
+        }
         setAnnouncements(list);
         if (list.length > 0) {
           setSelectedId(prev => (list.some(a => a.id === prev) ? prev : list[0].id));
@@ -43,7 +52,7 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
       .finally(() => {
         setLoading(false);
       });
-  }, [isOpen, onReadLatest]);
+  }, [isOpen, onReadLatest, user?.isAdmin]);
 
   // Listen for real-time announcements
   useEffect(() => {
@@ -54,9 +63,42 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
         onReadLatest?.(announcement.id);
       }
     };
+    const onDeleted = ({ id }) => {
+      setAnnouncements(prev => prev.filter(a => String(a.id) !== String(id)));
+      setSelectedId(prev => String(prev) === String(id) ? null : prev);
+    };
     socket.on('announcement:new', onNew);
-    return () => socket.off('announcement:new', onNew);
+    socket.on('announcement:deleted', onDeleted);
+    return () => {
+      socket.off('announcement:new', onNew);
+      socket.off('announcement:deleted', onDeleted);
+    };
   }, [socket, isOpen, onReadLatest]);
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (!user?.isAdmin) {
+      if (!window.confirm('Bạn có muốn xóa thư này khỏi hòm thư của bạn?')) return;
+      try {
+        const dismissed = JSON.parse(localStorage.getItem('ytm_dismissed_announcements') || '[]');
+        if (!dismissed.includes(id)) {
+          dismissed.push(id);
+          localStorage.setItem('ytm_dismissed_announcements', JSON.stringify(dismissed));
+        }
+        setAnnouncements(prev => prev.filter(a => a.id !== id));
+        if (selectedId === id) setSelectedId(null);
+      } catch (e) {}
+      return;
+    }
+
+    if (!window.confirm('Bạn có chắc chắn muốn xóa thư này khỏi hệ thống?')) return;
+    try {
+      await api.delete(`/announcements/${id}`);
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
+      if (selectedId === id) setSelectedId(null);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Không thể xóa thư.');
+    }
+  };
 
   // Close on Escape key
   useEffect(() => {
@@ -116,28 +158,62 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
 
               {announcements.map((item) => {
                 const isActive = item.id === selectedId;
+                const isHoverOrMobileActive = mobileActiveId === item.id;
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    onClick={() => {
-                      setSelectedId(item.id);
-                      setMobileView('detail');
-                    }}
-                    className={`w-full text-left px-4 py-3.5 transition flex flex-col gap-1 ${
+                    className={`relative group w-full transition flex items-center overflow-hidden cursor-pointer ${
                       isActive
                         ? 'bg-primary-600/20 border-l-4 border-primary-500 text-white'
                         : 'text-dark-200 hover:bg-dark-700/60 hover:text-white'
                     }`}
+                    onClick={() => {
+                      setMobileActiveId(prev => prev === item.id ? null : item.id);
+                    }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm font-medium truncate ${isActive ? 'text-white font-semibold' : ''}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(item.id);
+                        setMobileView('detail');
+                      }}
+                      className="w-full text-left px-4 py-3.5 flex flex-col gap-1 min-w-0"
+                    >
+                      <span className={`text-sm font-medium truncate block w-full ${isActive ? 'text-white font-semibold' : ''}`}>
                         {item.title}
                       </span>
+                      <span className="text-[11px] text-dark-300">
+                        {formatTime(item.created_at)}
+                      </span>
+                    </button>
+
+                    {/* Thanh Xóa khi hover (desktop) hoặc nhấn 1 lần (điện thoại) */}
+                    <div
+                      className={`absolute right-0 top-0 bottom-0 flex items-center pr-3 pl-8 transition-opacity duration-200 ${
+                        isActive
+                          ? 'bg-gradient-to-l from-[#1e2338] via-[#1e2338]/95 to-transparent'
+                          : 'bg-gradient-to-l from-dark-850 via-dark-850/95 group-hover:from-dark-700 group-hover:via-dark-700/95 to-transparent'
+                      } ${
+                        isHoverOrMobileActive
+                          ? 'opacity-100 pointer-events-auto'
+                          : 'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAnnouncement(item.id);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/15 rounded-lg transition"
+                        title="Xóa thư"
+                        aria-label="Xóa thư"
+                      >
+                        <Trash2 size={14} />
+                        <span>Xóa</span>
+                      </button>
                     </div>
-                    <span className="text-[11px] text-dark-300">
-                      {formatTime(item.created_at)}
-                    </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>

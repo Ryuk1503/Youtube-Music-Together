@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annSender, setAnnSender] = useState('RYUK');
+  const [annFutureUsers, setAnnFutureUsers] = useState(true);
   const [annSending, setAnnSending] = useState(false);
   const [annStatus, setAnnStatus] = useState({ type: '', message: '' });
 
@@ -45,6 +46,7 @@ export default function AdminPage() {
         title: annTitle.trim(),
         content: annContent.trim(),
         sender: annSender.trim() || 'Ban Quản Trị',
+        include_future_users: annFutureUsers,
       });
       setAnnStatus({ type: 'success', message: 'Đã gửi thông báo thành công tới toàn bộ người dùng!' });
       setAnnTitle('');
@@ -210,6 +212,18 @@ export default function AdminPage() {
               maxLength={5000}
               className="w-full rounded-lg bg-dark-700 border border-dark-500 p-3.5 text-sm text-white placeholder-dark-300 focus:outline-none focus:border-primary-500 leading-relaxed"
             />
+          </div>
+
+          <div className="pt-1">
+            <label className="inline-flex items-center gap-2.5 text-xs sm:text-sm text-dark-200 cursor-pointer select-none hover:text-white transition">
+              <input
+                type="checkbox"
+                checked={annFutureUsers}
+                onChange={e => setAnnFutureUsers(e.target.checked)}
+                className="w-4 h-4 rounded border-dark-500 bg-dark-700 text-primary-500 focus:ring-primary-500 focus:ring-offset-dark-800"
+              />
+              <span>Gửi cho cả những tài khoản đăng ký sau</span>
+            </label>
           </div>
 
           <button

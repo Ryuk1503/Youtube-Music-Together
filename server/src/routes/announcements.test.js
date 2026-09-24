@@ -56,6 +56,16 @@ test('announcements: 401 anonymous, 403 non-admin post, admin post and read', { 
     assert.equal(listGet.status, 200);
     assert.equal(listGet.data.announcements.length, 1);
     assert.equal(listGet.data.announcements[0].title, 'Test Announcement');
+
+    // Test delete announcement
+    const annId = adminPost.data.announcement.id;
+    const deleteRes = await call(`/announcements/${annId}`, null, userCookie, 'DELETE');
+    assert.equal(deleteRes.status, 200);
+    assert.equal(deleteRes.data.success, true);
+
+    const listAfterDelete = await call('/announcements', null, userCookie);
+    assert.equal(listAfterDelete.status, 200);
+    assert.equal(listAfterDelete.data.announcements.length, 0);
   } finally {
     dbModule.pool = original;
     if (server) await new Promise(resolve => server.close(resolve));

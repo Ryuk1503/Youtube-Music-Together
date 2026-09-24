@@ -4,6 +4,7 @@ import MemberProfileCard from './MemberProfileCard';
 
 export default function MemberList({ roomId, members, hostId, restricted, isHost, currentUserId, onKick, onRestrict, onTransferHost, onClose, inline }) {
   const [selected, setSelected] = useState(null);
+  const [mobileActiveUserId, setMobileActiveUserId] = useState(null);
   const closeTimer = useRef(null);
   const closeProfile = useCallback(() => { clearTimeout(closeTimer.current); setSelected(null); }, []);
   const keepProfile = () => clearTimeout(closeTimer.current);
@@ -34,55 +35,75 @@ export default function MemberList({ roomId, members, hostId, restricted, isHost
           return (
             <div
               key={member.userId}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-dark-600 group transition"
+              className="relative group flex items-center px-3 py-2.5 rounded-lg hover:bg-dark-600 transition overflow-hidden cursor-pointer"
+              onClick={() => {
+                setMobileActiveUserId(prev => prev === member.userId ? null : member.userId);
+              }}
             >
-              <button type="button" aria-label={`Xem hồ sơ ${member.username}`} className="flex min-w-0 flex-1 items-center gap-3 text-left rounded-lg focus-visible:outline focus-visible:outline-primary-400"
+              <button
+                type="button"
+                aria-label={`Xem hồ sơ ${member.username}`}
+                className="flex min-w-0 w-full items-center gap-3 text-left rounded-lg focus-visible:outline focus-visible:outline-primary-400"
                 onPointerEnter={event => { if (event.pointerType === 'mouse' && window.matchMedia('(hover: hover)').matches) openProfile(member, event.currentTarget, false); }}
                 onPointerLeave={() => { if (!selected?.modal) deferClose(); }}
-                onClick={event => openProfile(member, event.currentTarget, !window.matchMedia('(hover: hover) and (pointer: fine)').matches)}
-                onKeyDown={event => { if (event.key === 'Escape') closeProfile(); }}>
-              <div className="w-8 h-8 bg-primary-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <User size={16} className="text-primary-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-white font-medium truncate">
-                    {member.username}
-                  </span>
-                  {isMemberHost && <Crown size={12} className="text-yellow-400 flex-shrink-0" />}
-                  {isMemberRestricted && <Ban size={12} className="text-red-400 flex-shrink-0" />}
+                onClick={event => {
+                  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches && isHost && !isSelf && !isMemberHost) {
+                    return; // On mobile, first tap toggles actions bar
+                  }
+                  openProfile(member, event.currentTarget, !window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+                }}
+                onKeyDown={event => { if (event.key === 'Escape') closeProfile(); }}
+              >
+                <div className="w-8 h-8 bg-primary-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <User size={16} className="text-primary-400" />
                 </div>
-              </div>
-
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-white font-medium truncate">
+                      {member.username}
+                    </span>
+                    {isMemberHost && <Crown size={12} className="text-yellow-400 flex-shrink-0" />}
+                    {isMemberRestricted && <Ban size={12} className="text-red-400 flex-shrink-0" />}
+                  </div>
+                </div>
               </button>
 
               {isHost && !isSelf && !isMemberHost && (
-                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
-                  <button
-                    onClick={() => onRestrict(member.userId)}
-                    className={`w-7 h-7 flex items-center justify-center rounded-md transition ${
-                      isMemberRestricted
-                        ? 'text-green-400 hover:bg-green-400/10'
-                        : 'text-orange-400 hover:bg-orange-400/10'
-                    }`}
-                    title={isMemberRestricted ? 'Bỏ hạn chế' : 'Hạn chế thêm nhạc'}
-                  >
-                    {isMemberRestricted ? <ShieldOff size={14} /> : <Ban size={14} />}
-                  </button>
-                  <button
-                    onClick={() => onTransferHost(member.userId)}
-                    className="w-7 h-7 flex items-center justify-center text-blue-400 hover:bg-blue-400/10 rounded-md transition"
-                    title="Trao quyền Host"
-                  >
-                    <ArrowRightLeft size={14} />
-                  </button>
-                  <button
-                    onClick={() => onKick(member.userId)}
-                    className="w-7 h-7 flex items-center justify-center text-red-400 hover:bg-red-400/10 rounded-md transition"
-                    title="Đuổi"
-                  >
-                    <UserX size={14} />
-                  </button>
+                <div
+                  className={`absolute right-0 top-0 bottom-0 flex items-center pr-2 pl-8 bg-gradient-to-l from-dark-600 via-dark-600/95 to-transparent transition-opacity duration-150 ${
+                    mobileActiveUserId === member.userId
+                      ? 'opacity-100 pointer-events-auto'
+                      : 'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => onRestrict(member.userId)}
+                      className={`w-7 h-7 flex items-center justify-center rounded-md transition ${
+                        isMemberRestricted
+                          ? 'text-green-400 hover:bg-green-400/10'
+                          : 'text-orange-400 hover:bg-orange-400/10'
+                      }`}
+                      title={isMemberRestricted ? 'Bỏ hạn chế' : 'Hạn chế thêm nhạc'}
+                    >
+                      {isMemberRestricted ? <ShieldOff size={14} /> : <Ban size={14} />}
+                    </button>
+                    <button
+                      onClick={() => onTransferHost(member.userId)}
+                      className="w-7 h-7 flex items-center justify-center text-blue-400 hover:bg-blue-400/10 rounded-md transition"
+                      title="Trao quyền Host"
+                    >
+                      <ArrowRightLeft size={14} />
+                    </button>
+                    <button
+                      onClick={() => onKick(member.userId)}
+                      className="w-7 h-7 flex items-center justify-center text-red-400 hover:bg-red-400/10 rounded-md transition"
+                      title="Đuổi"
+                    >
+                      <UserX size={14} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

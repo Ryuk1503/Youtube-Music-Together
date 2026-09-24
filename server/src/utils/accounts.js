@@ -71,8 +71,10 @@ async function initAccounts(db) {
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       sender TEXT NOT NULL DEFAULT 'Ban Quản Trị',
+      include_future_users BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE system_announcements ADD COLUMN IF NOT EXISTS include_future_users BOOLEAN NOT NULL DEFAULT true;
   `);
 }
 module.exports = { initAccounts };
