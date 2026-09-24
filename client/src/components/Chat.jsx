@@ -8,8 +8,10 @@ export default function Chat({ messages, onSendMessage, username, userId, onActi
   const [editText, setEditText] = useState('');
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [mobileActiveId, setMobileActiveId] = useState(null);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
+  const isTouchOnly = () => !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -65,10 +67,18 @@ export default function Chat({ messages, onSendMessage, username, userId, onActi
           const own = userId != null && msg.userId != null && String(msg.userId) === String(userId);
           const liked = (msg.hearts || []).includes(String(userId));
           const actionClass = 'p-1.5 rounded text-dark-200 hover:text-white hover:bg-dark-500 disabled:opacity-40';
+          const msgKey = msg.id || i;
+          const isMobileActive = mobileActiveId === msgKey;
           return (
-          <div key={msg.id || i} className={`chat-message text-sm group relative px-1 rounded hover:bg-dark-600/40 ${i === 0 ? '' : continuation ? 'mt-0.5' : 'mt-3'}`}>
+          <div
+            key={msgKey}
+            className={`chat-message text-sm group relative px-1 rounded hover:bg-dark-600/40 ${i === 0 ? '' : continuation ? 'mt-0.5' : 'mt-3'} ${isMobileActive ? 'chat-message--active' : ''}`}
+            onClick={() => { if (isTouchOnly()) setMobileActiveId(prev => prev === msgKey ? null : msgKey); }}
+          >
             {msg.id && editingId !== msg.id && <div role="toolbar" aria-label="Thao tác tin nhắn"
-              className={`chat-actions absolute right-1 ${i === 0 ? 'top-0' : '-top-5'} z-10 flex items-center gap-0.5 p-0.5 bg-dark-800 border border-dark-400 rounded-lg shadow-lg`}>
+              className={`chat-actions absolute right-1 ${i === 0 ? 'top-0' : '-top-5'} z-10 flex items-center gap-0.5 p-0.5 bg-dark-800 border border-dark-400 rounded-lg shadow-lg`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <button type="button" onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }} title="Trả lời" aria-label={`Trả lời ${msg.username}`} className={actionClass}><Reply size={16} /></button>
               <button type="button" disabled={pending} onClick={() => actOnMessage('heart', { messageId: msg.id, liked: !liked })} title={liked ? 'Bỏ tim' : 'Thả tim'} aria-label={liked ? 'Bỏ tim' : 'Thả tim'} aria-pressed={liked} className={`${actionClass} ${liked ? 'text-red-400' : ''}`}><Heart size={16} fill={liked ? 'currentColor' : 'none'} /></button>
               {own && <>

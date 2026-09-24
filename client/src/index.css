@@ -75,5 +75,8 @@ input[type='range']::-moz-range-thumb {
   .chat-message:hover, .chat-message:focus-within { z-index: 20; }
 }
 @media (hover: none), (pointer: coarse) {
-  .chat-actions { position: static; width: max-content; margin-left: auto; margin-bottom: 2px; }
+  /* Ẩn toolbar mặc định, hiện khi tap 1 lần vào tin nhắn */
+  .chat-actions { display: none; position: absolute; width: max-content; }
+  .chat-message--active > .chat-actions { display: flex; }
+  .chat-message--active { z-index: 20; }
 }

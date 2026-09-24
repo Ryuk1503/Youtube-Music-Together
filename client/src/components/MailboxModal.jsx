@@ -205,12 +205,11 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
                           e.stopPropagation();
                           handleDeleteAnnouncement(item.id);
                         }}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/15 rounded-lg transition"
+                        className="p-1.5 text-dark-300 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition"
                         title="Xóa thư"
                         aria-label="Xóa thư"
                       >
-                        <Trash2 size={14} />
-                        <span>Xóa</span>
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
