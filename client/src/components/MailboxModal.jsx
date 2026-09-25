@@ -184,6 +184,7 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
             HÒM THƯ
           </h2>
           <button
+            type="button"
             onClick={onClose}
             className="absolute right-4 p-2 text-dark-200 hover:text-white hover:bg-dark-600 rounded-lg transition"
             aria-label="Đóng hòm thư"
@@ -285,11 +286,11 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
                       </span>
                       <div className="flex items-center gap-1.5">
                         {item.category === 'update' ? (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/25">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/25">
                             Cập nhật
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-dark-700 text-dark-300 border border-dark-600">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-dark-700 text-dark-300 border border-dark-600">
                             Thông báo
                           </span>
                         )}
