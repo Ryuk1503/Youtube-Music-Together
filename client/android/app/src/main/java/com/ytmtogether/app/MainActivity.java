@@ -35,8 +35,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // Tiếp tục giữ timers và âm thanh hoạt động khi màn hình tắt / chuyển app
+        // BridgeActivity.onPause() gọi webView.onPause() → tạm dừng JS và audio.
+        // Gọi lại webView.onResume() ngay để counteract, giữ nhạc phát liên tục khi background / màn hình tắt.
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().onResume();
             this.bridge.getWebView().resumeTimers();
         }
     }
@@ -44,6 +46,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStop() {
         super.onStop();
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().onResume();
+            this.bridge.getWebView().resumeTimers();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
         if (this.bridge != null && this.bridge.getWebView() != null) {
             this.bridge.getWebView().resumeTimers();
         }
