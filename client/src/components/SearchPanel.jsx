@@ -2,7 +2,7 @@ import { useState } from 'react';
 import api from '../api';
 import { Search, X, Plus, Loader2 } from 'lucide-react';
 
-export default function SearchPanel({ onAddToQueue }) {
+export default function SearchPanel({ onAddToQueue, onFocusChange, isExpandedMobile }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,7 +46,7 @@ export default function SearchPanel({ onAddToQueue }) {
   };
 
   return (
-    <div className="flex flex-col border-b border-dark-500 max-h-[50%]">
+    <div className={`flex flex-col border-b border-dark-500 ${isExpandedMobile ? 'flex-1 overflow-hidden md:max-h-[50%]' : 'max-h-[50%]'}`}>
       {/* Search bar */}
       <form onSubmit={handleSearch} className="p-4 flex-shrink-0">
         <div className="relative flex gap-2">
@@ -56,6 +56,8 @@ export default function SearchPanel({ onAddToQueue }) {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => onFocusChange?.(true)}
+              onBlur={() => onFocusChange?.(false)}
               className="w-full pl-9 pr-9 py-2.5 bg-dark-600 border border-dark-400 rounded-lg text-white placeholder-dark-300 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition text-sm"
               placeholder="Tìm kiếm bài hát..."
             />

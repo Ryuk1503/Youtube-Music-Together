@@ -53,8 +53,37 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
   const [autoAdding, setAutoAdding] = useState(false);
   const [autoAddError, setAutoAddError] = useState('');
   const [mobileTab, setMobileTab] = useState('player'); // 'player' | 'queue' | 'members'
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const maxWindowHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 800);
   const pendingSeekRef = useRef(0); // for syncing playback position on join
   const desiredPlayingRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      if (window.innerHeight > maxWindowHeightRef.current) {
+        maxWindowHeightRef.current = window.innerHeight;
+      }
+      const vv = window.visualViewport;
+      const currentHeight = vv ? vv.height : window.innerHeight;
+      const isKeyboard = maxWindowHeightRef.current - currentHeight > 140;
+      setKeyboardOpen(isKeyboard);
+    };
+
+    window.addEventListener('resize', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      }
+    };
+  }, []);
+
+  const hideQueueOnMobile = searchFocused || keyboardOpen;
 
   // Media Session API — lock screen controls & metadata
   useEffect(() => {
@@ -612,8 +641,12 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
         </div>
 
         <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'queue' ? '' : 'hidden'}`}>
-          <SearchPanel onAddToQueue={handleAddToQueue} />
-          <Queue {...queueProps} />
+          <SearchPanel
+            onAddToQueue={handleAddToQueue}
+            onFocusChange={setSearchFocused}
+            isExpandedMobile={hideQueueOnMobile}
+          />
+          {!hideQueueOnMobile && <Queue {...queueProps} />}
         </div>
 
         <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'members' ? '' : 'hidden'}`}>

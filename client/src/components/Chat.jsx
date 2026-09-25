@@ -11,7 +11,27 @@ export default function Chat({ messages, onSendMessage, username, userId, onActi
   const [mobileActiveId, setMobileActiveId] = useState(null);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
-  const isTouchOnly = () => !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const longPressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+
+  const handlePointerDown = (msgKey) => (e) => {
+    if (e.pointerType === 'mouse') return;
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (window.navigator?.vibrate) {
+        try { window.navigator.vibrate(40); } catch (_) {}
+      }
+      setMobileActiveId(prev => prev === msgKey ? null : msgKey);
+    }, 1000);
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -72,8 +92,18 @@ export default function Chat({ messages, onSendMessage, username, userId, onActi
           return (
           <div
             key={msgKey}
-            className={`chat-message text-sm group relative px-1 rounded hover:bg-dark-600/40 ${i === 0 ? '' : continuation ? 'mt-0.5' : 'mt-3'} ${isMobileActive ? 'chat-message--active' : ''}`}
-            onClick={() => { if (isTouchOnly()) setMobileActiveId(prev => prev === msgKey ? null : msgKey); }}
+            className={`chat-message text-sm group relative px-1 rounded hover:bg-dark-600/40 select-none ${i === 0 ? '' : continuation ? 'mt-0.5' : 'mt-3'} ${isMobileActive ? 'chat-message--active' : ''}`}
+            onPointerDown={handlePointerDown(msgKey)}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onClick={() => {
+              if (isLongPressRef.current) {
+                isLongPressRef.current = false;
+                return;
+              }
+              if (isMobileActive) setMobileActiveId(null);
+            }}
           >
             {msg.id && editingId !== msg.id && <div role="toolbar" aria-label="Thao tác tin nhắn"
               className={`chat-actions absolute right-1 ${i === 0 ? 'top-0' : '-top-5'} z-10 flex items-center gap-0.5 p-0.5 bg-dark-800 border border-dark-400 rounded-lg shadow-lg`}

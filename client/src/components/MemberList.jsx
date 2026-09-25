@@ -6,12 +6,43 @@ export default function MemberList({ roomId, members, hostId, restricted, isHost
   const [selected, setSelected] = useState(null);
   const [mobileActiveUserId, setMobileActiveUserId] = useState(null);
   const closeTimer = useRef(null);
+  const longPressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+
   const closeProfile = useCallback(() => { clearTimeout(closeTimer.current); setSelected(null); }, []);
   const keepProfile = () => clearTimeout(closeTimer.current);
   const deferClose = () => { clearTimeout(closeTimer.current); closeTimer.current = setTimeout(() => setSelected(null), 180); };
   useEffect(() => () => clearTimeout(closeTimer.current), []);
   useEffect(() => { if (selected && !members.some(member => member.userId === selected.member.userId)) closeProfile(); }, [members, selected, closeProfile]);
   const openProfile = (member, element, modal) => { keepProfile(); setSelected({ member, anchor: element.getBoundingClientRect(), modal }); };
+
+  const handlePointerDown = (memberId, hasActions) => (e) => {
+    if (e.pointerType === 'mouse' || !hasActions) return;
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (window.navigator?.vibrate) {
+        try { window.navigator.vibrate(40); } catch (_) {}
+      }
+      setMobileActiveUserId(memberId);
+    }, 1000);
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleMemberClick = (member, event) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    openProfile(member, event.currentTarget, !window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+  };
+
   const content = (
     <>
       <div className="flex items-center justify-between px-4 py-4 border-b border-dark-500 flex-shrink-0">
@@ -31,14 +62,16 @@ export default function MemberList({ roomId, members, hostId, restricted, isHost
           const isMemberHost = String(member.userId) === String(hostId);
           const isSelf = String(member.userId) === String(currentUserId);
           const isMemberRestricted = restricted?.includes(String(member.userId));
+          const hasActions = isHost && !isSelf && !isMemberHost;
 
           return (
             <div
               key={member.userId}
-              className="relative group flex items-center px-3 py-2.5 rounded-lg hover:bg-dark-600 transition overflow-hidden cursor-pointer"
-              onClick={() => {
-                setMobileActiveUserId(prev => prev === member.userId ? null : member.userId);
-              }}
+              className="relative group flex items-center px-3 py-2.5 rounded-lg hover:bg-dark-600 transition overflow-hidden cursor-pointer select-none"
+              onPointerDown={handlePointerDown(member.userId, hasActions)}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              onPointerCancel={handlePointerUp}
             >
               <button
                 type="button"
@@ -46,12 +79,7 @@ export default function MemberList({ roomId, members, hostId, restricted, isHost
                 className="flex min-w-0 w-full items-center gap-3 text-left rounded-lg focus-visible:outline focus-visible:outline-primary-400"
                 onPointerEnter={event => { if (event.pointerType === 'mouse' && window.matchMedia('(hover: hover)').matches) openProfile(member, event.currentTarget, false); }}
                 onPointerLeave={() => { if (!selected?.modal) deferClose(); }}
-                onClick={event => {
-                  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches && isHost && !isSelf && !isMemberHost) {
-                    return; // On mobile, first tap toggles actions bar
-                  }
-                  openProfile(member, event.currentTarget, !window.matchMedia('(hover: hover) and (pointer: fine)').matches);
-                }}
+                onClick={event => handleMemberClick(member, event)}
                 onKeyDown={event => { if (event.key === 'Escape') closeProfile(); }}
               >
                 <div className="w-8 h-8 bg-primary-600/20 rounded-full flex items-center justify-center flex-shrink-0">

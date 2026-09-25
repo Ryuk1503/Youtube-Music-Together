@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Mail, X, Calendar, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '../api';
 import { useSocket } from '../context/SocketContext';
@@ -25,6 +25,36 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
   const [error, setError] = useState('');
   const [mobileView, setMobileView] = useState('list'); // 'list' | 'detail'
   const [mobileActiveId, setMobileActiveId] = useState(null);
+  const longPressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+
+  const handlePointerDown = (id) => (e) => {
+    if (e.pointerType === 'mouse') return;
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (window.navigator?.vibrate) {
+        try { window.navigator.vibrate(40); } catch (_) {}
+      }
+      setMobileActiveId(id);
+    }, 1000);
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleItemClick = (item) => () => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    setSelectedId(item.id);
+    setMobileView('detail');
+  };
 
   // Fetch announcements when opened
   useEffect(() => {
@@ -162,32 +192,27 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
                 return (
                   <div
                     key={item.id}
-                    className={`relative group w-full transition flex items-center overflow-hidden cursor-pointer ${
+                    className={`relative group w-full transition flex items-center overflow-hidden cursor-pointer select-none ${
                       isActive
                         ? 'bg-primary-600/20 border-l-4 border-primary-500 text-white'
                         : 'text-dark-200 hover:bg-dark-700/60 hover:text-white'
                     }`}
-                    onClick={() => {
-                      setMobileActiveId(prev => prev === item.id ? null : item.id);
-                    }}
+                    onPointerDown={handlePointerDown(item.id)}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                    onClick={handleItemClick(item)}
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedId(item.id);
-                        setMobileView('detail');
-                      }}
-                      className="w-full text-left px-4 py-3.5 flex flex-col gap-1 min-w-0"
-                    >
+                    <div className="w-full text-left px-4 py-3.5 flex flex-col gap-1 min-w-0">
                       <span className={`text-sm font-medium truncate block w-full ${isActive ? 'text-white font-semibold' : ''}`}>
                         {item.title}
                       </span>
                       <span className="text-[11px] text-dark-300">
                         {formatTime(item.created_at)}
                       </span>
-                    </button>
+                    </div>
 
-                    {/* Thanh Xóa khi hover (desktop) hoặc nhấn 1 lần (điện thoại) */}
+                    {/* Thanh Xóa khi hover (desktop) hoặc giữ 1s (điện thoại) */}
                     <div
                       className={`absolute right-0 top-0 bottom-0 flex items-center pr-3 pl-8 transition-opacity duration-200 ${
                         isActive
@@ -198,6 +223,7 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
                           ? 'opacity-100 pointer-events-auto'
                           : 'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto'
                       }`}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"
