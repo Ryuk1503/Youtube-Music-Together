@@ -36,9 +36,10 @@ Tài liệu này theo dõi toàn bộ tiến trình đóng gói và phát triể
   - Cấu hình Foreground Service (`MusicService.java`) với `WAKE_LOCK` và Notification ongoing giữ app không bị Android hệ thống đóng.
   - Vô hiệu hóa sự kiện `visibilitychange` và khóa `document.hidden = false` trong môi trường App Native. (Hoàn thành)
 
-- [x] **Bước 4: Biên dịch và đóng gói file APK (`app-debug.apk`)** `[🤖 AI]`
+- [x] **Bước 4: Biên dịch và đóng gói file APK (`app-debug.apk`) & In-App Update** `[🤖 AI]`
   - Thiết lập biến môi trường `JAVA_HOME` (JDK 23) và `ANDROID_HOME` (Android Sdk).
-  - Chạy Gradle Wrapper (`gradlew.bat assembleDebug`) trong `client/android/`.
+  - Tích hợp Native Plugin `AppUpdatePlugin.java` & `REQUEST_INSTALL_PACKAGES` để hỗ trợ tải và tự động mở trình cài đặt cập nhật ngay trong ứng dụng.
+  - Chạy Gradle Wrapper (`gradlew.bat assembleDebug`) trong `client/android/` (versionCode 2, versionName 1.0.1).
   - Xuất file cài đặt `YTM-Together.apk` ra ngay thư mục gốc dự án. (Hoàn thành)
 
 - [ ] **Bước 5: Cài đặt và kiểm thử thực tế trên điện thoại** `[👤 USER]`

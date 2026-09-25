@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader';
 import ItemBrowser from '../components/ItemBrowser';
 import { useShopData, useShopAction } from '../hooks/useShop';
@@ -25,7 +24,6 @@ export default function ShopPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-white">Shop</h2>
         <div className="flex items-center gap-4">
-          <Link to="/inventory" className="text-sm text-primary-400 hover:text-primary-300">Túi đồ</Link>
           <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-sm font-semibold text-amber-300">♪ {data ? new Intl.NumberFormat('vi-VN').format(BigInt(data.notes)) : '—'} Notes</span>
         </div>
       </div>

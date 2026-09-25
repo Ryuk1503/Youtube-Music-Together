@@ -11,6 +11,7 @@ import ShopPage from './pages/ShopPage';
 import InventoryPage from './pages/InventoryPage';
 import AdminPage from './pages/AdminPage';
 import MobileBlocker, { isMobileDevice } from './components/MobileBlocker';
+import AppUpdateChecker from './components/AppUpdateChecker';
 
 export function ListeningRoutes() {
   const location = useLocation();
@@ -61,7 +62,10 @@ export default function App() {
   if (!loading && user) {
     return (
       <SocketProvider>
-        <AccountNotice><ListeningRoutes /></AccountNotice>
+        <AccountNotice>
+          <ListeningRoutes />
+          <AppUpdateChecker />
+        </AccountNotice>
       </SocketProvider>
     );
   }

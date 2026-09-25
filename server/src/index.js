@@ -68,6 +68,7 @@ app.use('/api/guest', guestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/shop', require('./routes/shop'));
 app.use('/api/announcements', require('./routes/announcements'));
+app.use('/api/app', require('./routes/appVersion'));
 
 // Health check
 app.get('/api/health', (req, res) => {

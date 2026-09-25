@@ -1,4 +1,4 @@
-import { Monitor, Smartphone, Sparkles, Music } from 'lucide-react';
+import { Monitor, Smartphone, Sparkles, Music, Download } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 
 export function isMobileDevice() {
@@ -38,11 +38,17 @@ export default function MobileBlocker() {
           <div className="p-2 bg-primary-600/20 rounded-xl text-primary-400 flex-shrink-0 mt-0.5">
             <Sparkles size={18} />
           </div>
-          <div>
-            <h4 className="text-xs font-semibold text-white mb-1">Ứng dụng di động sắp ra mắt</h4>
-            <p className="text-xs text-dark-300 leading-relaxed">
-              Phiên bản Mobile App đang được chuẩn bị để hỗ trợ phát nhạc trong nền và tắt màn hình mượt mà!
+          <div className="flex-1">
+            <h4 className="text-xs font-semibold text-white mb-1">Đã có ứng dụng Android chính thức!</h4>
+            <p className="text-xs text-dark-300 leading-relaxed mb-3">
+              Hỗ trợ nghe nhạc trong nền khi tắt màn hình hoặc chuyển app mượt mà.
             </p>
+            <a
+              href="https://github.com/Ryuk1503/Youtube-Music-Together/raw/main/YTM-Together.apk"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md transition"
+            >
+              <Download size={14} /> Tải APK về máy
+            </a>
           </div>
         </div>
 

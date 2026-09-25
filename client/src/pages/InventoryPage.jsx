@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import SiteHeader from '../components/SiteHeader';
 import ItemBrowser from '../components/ItemBrowser';
@@ -25,7 +24,6 @@ export default function InventoryPage() {
     <main className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-white">Túi đồ</h2>
-        <Link to="/shop" className="text-sm text-primary-400 hover:text-primary-300">Đến Shop</Link>
       </div>
       {message && <p role="status" className="mt-5 text-sm text-green-400">{message}</p>}
       {error && <p role="alert" className="mt-5 text-sm text-red-400">{error} <button onClick={reload} className="underline">Thử lại</button></p>}

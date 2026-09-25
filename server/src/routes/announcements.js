@@ -8,7 +8,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const userCreatedAt = req.account?.created_at || new Date(0);
     const { rows } = await pool.query(
-      `SELECT id, title, content, sender, include_future_users, created_at 
+      `SELECT id, title, content, sender, category, include_future_users, created_at 
        FROM system_announcements 
        WHERE include_future_users = true OR created_at >= $1
        ORDER BY created_at DESC, id DESC 
@@ -25,6 +25,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
   const sender = typeof req.body.sender === 'string' && req.body.sender.trim() ? req.body.sender.trim() : 'Ban Quản Trị';
+  const category = req.body.category === 'update' ? 'update' : 'general';
   const includeFutureUsers = req.body.include_future_users !== false;
   if (!title || !content) {
     return res.status(400).json({ error: 'Tiêu đề và nội dung không được để trống.' });
@@ -34,8 +35,8 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      `INSERT INTO system_announcements (title, content, sender, include_future_users) VALUES ($1, $2, $3, $4) RETURNING id, title, content, sender, include_future_users, created_at`,
-      [title, content, sender, includeFutureUsers]
+      `INSERT INTO system_announcements (title, content, sender, category, include_future_users) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, content, sender, category, include_future_users, created_at`,
+      [title, content, sender, category, includeFutureUsers]
     );
     const announcement = rows[0];
     const io = req.app.get('io');

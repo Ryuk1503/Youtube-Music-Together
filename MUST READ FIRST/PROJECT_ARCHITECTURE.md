@@ -243,18 +243,21 @@ Chi tiết schema + quyết định: **`MUSIC_HISTORY.md`**.
 
 | File | Symbol quan trọng |
 |---|---|
-| `server/src/routes/announcements.js` | `GET /api/announcements` (lấy danh sách thông báo hệ thống, lọc theo `include_future_users` và ngày tạo tài khoản), `POST /api/announcements` (admin gửi thông báo mới kèm cờ `include_future_users`, emit `announcement:new`), `DELETE /api/announcements/:id` (admin xóa thông báo, emit `announcement:deleted`) |
-| `client/src/components/MailboxModal.jsx` | Cửa sổ Hòm thư lớn (modal 2 cột): cột trái hiển thị danh sách thư, nút Xóa khi hover với hiệu ứng gradient làm mờ chữ, hỗ trợ tap 1 lần trên điện thoại, cột phải hiển thị tựa đề, nội dung và phần Ký tên cố định ở đáy |
+| `server/src/routes/announcements.js` | `GET /api/announcements` (lấy danh sách thông báo hệ thống, lọc theo `include_future_users` và ngày tạo tài khoản, bao gồm `category`), `POST /api/announcements` (admin gửi thông báo mới kèm `category` 'update'/'general' và cờ `include_future_users`, emit `announcement:new`), `DELETE /api/announcements/:id` (admin xóa thông báo, emit `announcement:deleted`) |
+| `client/src/components/MailboxModal.jsx` | Cửa sổ Hòm thư lớn (modal 2 cột): cột trái có 3 tab chuyển đổi (Tất cả, Cập nhật, Thông báo), danh sách thư gắn tag phân loại, nút Xóa khi hover/giữ, cột phải hiển thị tựa đề, render link trực tiếp, nội dung và phần Ký tên cố định ở đáy |
 | `client/src/components/SiteHeader.jsx` | Icon Hòm thư cạnh lời chào người dùng, hiển thị chấm đỏ khi có thư chưa đọc |
-| `client/src/pages/AdminPage.jsx` | Khung soạn thảo và gửi thư thông báo toàn hệ thống dành cho Admin, có checkbox "Gửi cho cả những tài khoản đăng ký sau" |
+| `client/src/pages/AdminPage.jsx` | Khung soạn thảo và gửi thư thông báo toàn hệ thống dành cho Admin, có chọn mục hiển thị (Thông báo / Cập nhật) và checkbox "Gửi cho cả những tài khoản đăng ký sau" |
 
-**Bảng DB:** `system_announcements` (id, title, content, sender, include_future_users, created_at).
+**Bảng DB:** `system_announcements` (id, title, content, sender, category, include_future_users, created_at).
 
-### 8.3 Lớp chặn truy cập trên điện thoại (Mobile Guard)
+### 8.3 Lớp chặn truy cập trên điện thoại (Mobile Guard) & Cập nhật In-App APK
 
 | File | Symbol quan trọng |
 |---|---|
-| `client/src/components/MobileBlocker.jsx` | `isMobileDevice` (kiểm tra `navigator.userAgent`), màn hình thông báo chặn truy cập trên điện thoại và gợi ý dùng máy tính hoặc chờ bản app mobile |
+| `client/src/components/MobileBlocker.jsx` | `isMobileDevice` (kiểm tra `navigator.userAgent`), màn hình chặn truy cập trên mobile browser kèm nút tải trực tiếp file APK Android |
+| `server/src/routes/appVersion.js` | `GET /api/app/version` (trả về versionCode, versionName, apkUrl, changelog phục vụ kiểm tra cập nhật APK) |
+| `client/android/app/src/main/java/com/ytmtogether/app/AppUpdatePlugin.java` | Native Capacitor Plugin: `getAppInfo` (đọc versionCode), `downloadAndInstall` (tải APK ngầm, báo % tiến trình qua listener và mở Intent FileProvider cài đặt) |
+| `client/src/components/AppUpdateChecker.jsx` | Tự động kiểm tra bản cập nhật khi chạy trên Native App (`Capacitor.isNativePlatform()`), hiển thị modal cập nhật và thanh tiến trình download |
 | `client/src/App.jsx` | Tích hợp lớp kiểm tra ở root component, bảo lưu 100% mã nguồn các trang và route hiện có |
 
 ---

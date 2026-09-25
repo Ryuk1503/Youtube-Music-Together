@@ -16,11 +16,34 @@ function formatTime(iso) {
   });
 }
 
+function renderFormattedContent(text) {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary-400 underline hover:text-primary-300 break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
   const socket = useSocket();
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'update' | 'general'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mobileView, setMobileView] = useState('list'); // 'list' | 'detail'
@@ -140,9 +163,13 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const filteredAnnouncements = announcements.filter(item => {
+    if (activeTab === 'update') return item.category === 'update';
+    if (activeTab === 'general') return item.category !== 'update';
+    return true;
+  });
 
-  const selected = announcements.find(a => a.id === selectedId) || null;
+  const selected = filteredAnnouncements.find(a => a.id === selectedId) || filteredAnnouncements[0] || null;
 
   return (
     <div
@@ -171,8 +198,57 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
           
           {/* Left Column: Danh sách thư theo từng dòng */}
           <div className={`w-full md:w-80 border-r-2 border-dark-500 flex flex-col bg-dark-850/50 flex-shrink-0 ${mobileView === 'detail' ? 'hidden md:flex' : 'flex'}`}>
-            <div className="px-4 py-3 border-b border-dark-600 flex items-center justify-between text-xs text-dark-300 font-medium">
-              <span>Tất cả ({announcements.length})</span>
+            <div className="px-2.5 py-2 border-b border-dark-600 flex items-center justify-between gap-1 text-xs bg-dark-900/40">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('all');
+                  if (announcements.length > 0 && !announcements.some(a => a.id === selectedId)) {
+                    setSelectedId(announcements[0].id);
+                  }
+                }}
+                className={`flex-1 py-1 px-1.5 rounded-lg text-center font-medium transition ${
+                  activeTab === 'all'
+                    ? 'bg-primary-600/30 text-primary-300 font-semibold shadow-sm'
+                    : 'text-dark-300 hover:text-white hover:bg-dark-700/50'
+                }`}
+              >
+                Tất cả ({announcements.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('update');
+                  const list = announcements.filter(a => a.category === 'update');
+                  if (list.length > 0 && !list.some(a => a.id === selectedId)) {
+                    setSelectedId(list[0].id);
+                  }
+                }}
+                className={`flex-1 py-1 px-1.5 rounded-lg text-center font-medium transition ${
+                  activeTab === 'update'
+                    ? 'bg-primary-600/30 text-primary-300 font-semibold shadow-sm'
+                    : 'text-dark-300 hover:text-white hover:bg-dark-700/50'
+                }`}
+              >
+                Cập nhật ({announcements.filter(a => a.category === 'update').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('general');
+                  const list = announcements.filter(a => a.category !== 'update');
+                  if (list.length > 0 && !list.some(a => a.id === selectedId)) {
+                    setSelectedId(list[0].id);
+                  }
+                }}
+                className={`flex-1 py-1 px-1.5 rounded-lg text-center font-medium transition ${
+                  activeTab === 'general'
+                    ? 'bg-primary-600/30 text-primary-300 font-semibold shadow-sm'
+                    : 'text-dark-300 hover:text-white hover:bg-dark-700/50'
+                }`}
+              >
+                Thông báo ({announcements.filter(a => a.category !== 'update').length})
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-dark-600/60">
@@ -182,11 +258,11 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
               {error && announcements.length === 0 && (
                 <div className="p-6 text-center text-red-400 text-sm">{error}</div>
               )}
-              {!loading && !error && announcements.length === 0 && (
-                <div className="p-8 text-center text-dark-300 text-sm">Hòm thư trống</div>
+              {!loading && !error && filteredAnnouncements.length === 0 && (
+                <div className="p-8 text-center text-dark-300 text-sm">Không có thư trong mục này</div>
               )}
 
-              {announcements.map((item) => {
+              {filteredAnnouncements.map((item) => {
                 const isActive = item.id === selectedId;
                 const isHoverOrMobileActive = mobileActiveId === item.id;
                 return (
@@ -203,13 +279,24 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
                     onPointerCancel={handlePointerUp}
                     onClick={handleItemClick(item)}
                   >
-                    <div className="w-full text-left px-4 py-3.5 flex flex-col gap-1 min-w-0">
+                    <div className="w-full text-left px-4 py-3 flex flex-col gap-1 min-w-0">
                       <span className={`text-sm font-medium truncate block w-full ${isActive ? 'text-white font-semibold' : ''}`}>
                         {item.title}
                       </span>
-                      <span className="text-[11px] text-dark-300">
-                        {formatTime(item.created_at)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {item.category === 'update' ? (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/25">
+                            Cập nhật
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-dark-700 text-dark-300 border border-dark-600">
+                            Thông báo
+                          </span>
+                        )}
+                        <span className="text-[11px] text-dark-300">
+                          {formatTime(item.created_at)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Thanh Xóa khi hover (desktop) hoặc giữ 1s (điện thoại) */}
@@ -264,13 +351,24 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
                   <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 leading-snug">
                     {selected.title}
                   </h3>
-                  <p className="text-xs text-dark-300 pb-4 mb-6 border-b border-dark-600 flex items-center gap-1.5">
-                    <Calendar size={14} className="text-dark-300" />
-                    {formatTime(selected.created_at)}
-                  </p>
+                  <div className="text-xs text-dark-300 pb-4 mb-6 border-b border-dark-600 flex items-center gap-2">
+                    {selected.category === 'update' ? (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        Cập nhật
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-dark-700 text-dark-200 border border-dark-600">
+                        Thông báo
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5 text-dark-300">
+                      <Calendar size={14} className="text-dark-300" />
+                      {formatTime(selected.created_at)}
+                    </span>
+                  </div>
 
                   <div className="text-sm sm:text-base text-dark-100 whitespace-pre-wrap leading-relaxed font-normal">
-                    {selected.content}
+                    {renderFormattedContent(selected.content)}
                   </div>
                 </div>
 

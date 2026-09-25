@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annSender, setAnnSender] = useState('RYUK');
+  const [annCategory, setAnnCategory] = useState('general');
   const [annFutureUsers, setAnnFutureUsers] = useState(true);
   const [annSending, setAnnSending] = useState(false);
   const [annStatus, setAnnStatus] = useState({ type: '', message: '' });
@@ -46,6 +47,7 @@ export default function AdminPage() {
         title: annTitle.trim(),
         content: annContent.trim(),
         sender: annSender.trim() || 'Ban Quản Trị',
+        category: annCategory,
         include_future_users: annFutureUsers,
       });
       setAnnStatus({ type: 'success', message: 'Đã gửi thông báo thành công tới toàn bộ người dùng!' });
@@ -199,6 +201,34 @@ export default function AdminPage() {
               maxLength={100}
               className="w-full sm:w-72 rounded-lg bg-dark-700 border border-dark-500 px-3.5 py-2 text-sm text-white placeholder-dark-300 focus:outline-none focus:border-primary-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-dark-200 mb-1.5">Mục hiển thị</label>
+            <div className="flex gap-4">
+              <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-dark-200 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="annCategory"
+                  value="general"
+                  checked={annCategory === 'general'}
+                  onChange={e => setAnnCategory(e.target.value)}
+                  className="w-4 h-4 text-primary-500 bg-dark-700 border-dark-500 focus:ring-primary-500"
+                />
+                <span>Thông báo</span>
+              </label>
+              <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-dark-200 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="annCategory"
+                  value="update"
+                  checked={annCategory === 'update'}
+                  onChange={e => setAnnCategory(e.target.value)}
+                  className="w-4 h-4 text-primary-500 bg-dark-700 border-dark-500 focus:ring-primary-500"
+                />
+                <span>Cập nhật</span>
+              </label>
+            </div>
           </div>
 
           <div>
