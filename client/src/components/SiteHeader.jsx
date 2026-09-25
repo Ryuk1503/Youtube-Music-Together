@@ -120,11 +120,13 @@ export default function SiteHeader() {
       </header>
 
       {/* Large Mailbox Window Modal */}
-      <MailboxModal
-        isOpen={mailboxOpen}
-        onClose={() => setMailboxOpen(false)}
-        onReadLatest={handleReadLatest}
-      />
+      {mailboxOpen && (
+        <MailboxModal
+          isOpen={mailboxOpen}
+          onClose={() => setMailboxOpen(false)}
+          onReadLatest={handleReadLatest}
+        />
+      )}
     </>
   );
 }

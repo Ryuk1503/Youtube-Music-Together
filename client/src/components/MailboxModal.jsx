@@ -171,6 +171,8 @@ export default function MailboxModal({ isOpen, onClose, onReadLatest }) {
 
   const selected = filteredAnnouncements.find(a => a.id === selectedId) || filteredAnnouncements[0] || null;
 
+  if (!isOpen) return null;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm animate-fadeIn"
