@@ -2,12 +2,12 @@ const express = require('express');
 const router = express.Router();
 
 const APP_VERSION_INFO = {
-  versionCode: 2,
-  versionName: '1.0.1',
+  versionCode: 3,
+  versionName: '1.0.2',
   minSupportedVersionCode: 1,
   apkUrl: 'https://github.com/Ryuk1503/Youtube-Music-Together/raw/main/YTM-Together.apk',
-  changelog: 'Bản cập nhật Android mới:\n- Nghe nhạc nền ổn định khi tắt màn hình hoặc chuyển ứng dụng.\n- Hỗ trợ tải và cài đặt cập nhật tự động ngay trong ứng dụng.',
-  releaseDate: '2026-09-25',
+  changelog: 'Bản cập nhật Android v1.0.2:\n- Yêu cầu cấp quyền Thông báo và Bỏ qua tối ưu pin (hỗ trợ đặc biệt máy Xiaomi / MIUI).\n- Tối ưu phát nhạc nền khi tắt màn hình và chuyển ứng dụng.\n- Giữ kết nối WiFi và âm thanh liên tục.',
+  releaseDate: '2026-09-26',
 };
 
 router.get('/version', (req, res) => {

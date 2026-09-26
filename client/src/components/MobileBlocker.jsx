@@ -1,4 +1,4 @@
-import { Monitor, Smartphone, Sparkles, Music, Download } from 'lucide-react';
+import { Monitor, Smartphone, Music, Download } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 
 export function isMobileDevice() {
@@ -30,31 +30,20 @@ export default function MobileBlocker() {
           Hiện chỉ hỗ trợ trên máy tính
         </h1>
 
-        <p className="text-sm text-dark-200 leading-relaxed mb-6 font-normal">
+        <p className="text-sm text-dark-200 leading-relaxed font-normal mb-2">
           Để đảm bảo trải nghiệm nghe nhạc ổn định, phiên bản web hiện đã tạm ngưng hỗ trợ trên trình duyệt điện thoại.
         </p>
 
-        <div className="w-full bg-dark-700/60 border border-dark-600 rounded-2xl p-4 text-left flex items-start gap-3.5 mb-6">
-          <div className="p-2 bg-primary-600/20 rounded-xl text-primary-400 flex-shrink-0 mt-0.5">
-            <Sparkles size={18} />
-          </div>
-          <div className="flex-1">
-            <h4 className="text-xs font-semibold text-white mb-1">Đã có ứng dụng Android chính thức!</h4>
-            <p className="text-xs text-dark-300 leading-relaxed mb-3">
-              Hỗ trợ nghe nhạc trong nền khi tắt màn hình hoặc chuyển app mượt mà.
-            </p>
-            <a
-              href="https://github.com/Ryuk1503/Youtube-Music-Together/raw/main/YTM-Together.apk"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md transition"
-            >
-              <Download size={14} /> Tải APK về máy
-            </a>
-          </div>
-        </div>
-
-        <p className="text-xs text-dark-300">
-          Vui lòng truy cập bằng <span className="text-white font-medium">máy tính (PC / Laptop)</span> để tiếp tục nghe nhạc cùng nhau.
+        <p className="text-sm text-dark-200 leading-relaxed font-normal mb-6">
+          Thay vào đó, chúng tôi đã phát hành chính thức ứng dụng trên Android.
         </p>
+
+        <a
+          href="https://github.com/Ryuk1503/Youtube-Music-Together/raw/main/YTM-Together.apk"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-semibold shadow-lg shadow-primary-600/25 transition transform hover:-translate-y-0.5 active:translate-y-0"
+        >
+          <Download size={16} /> Tải APK
+        </a>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { createListeningProgress } from '../listeningProgress';
 
 const CONTAINER_ID = 'yt-player-persistent';
@@ -87,8 +88,24 @@ export default function useYouTubePlayer() {
             if (destroyed) return;
             if (event.data === window.YT.PlayerState.PLAYING) {
               setError('');
+              if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+              }
               onPlayingRef.current?.();
             } else if (event.data === window.YT.PlayerState.PAUSED) {
+              // Nếu đang chạy native app và phòng đang muốn phát nhạc mà YouTube lại tự pause
+              // (xảy ra khi tắt màn hình hoặc chuyển app trên mobile):
+              if (Capacitor.isNativePlatform() && desiredPlayingRef.current) {
+                setTimeout(() => {
+                  if (desiredPlayingRef.current && playerRef.current?.playVideo) {
+                    playerRef.current.playVideo();
+                  }
+                }, 120);
+                return;
+              }
+              if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'paused';
+              }
               onPausedRef.current?.();
             } else if (event.data === window.YT.PlayerState.ENDED) {
               const ct = playerRef.current?.getCurrentTime?.() || 0;
@@ -186,11 +203,17 @@ export default function useYouTubePlayer() {
 
   const play = useCallback(() => {
     desiredPlayingRef.current = true;
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
     playerRef.current?.playVideo?.();
   }, []);
 
   const pause = useCallback(() => {
     desiredPlayingRef.current = false;
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'paused';
+    }
     playerRef.current?.pauseVideo?.();
   }, []);
 
