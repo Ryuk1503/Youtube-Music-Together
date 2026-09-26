@@ -17,6 +17,7 @@
 7. **Thấy dấu hiệu refactor dở dang / duplicate implementation / nhiều code path song song** → KHÔNG tự chọn một path để "sửa". Dừng lại, báo cáo và hỏi user.
 8. **Hoàn thành task code = Completed/Files changed/Verification/Architecture/Out-of-scope findings** (mục 6).
 9. **Sau khi verify:** deploy theo `AGENTS.md` (deploy là một phần hoàn thành task, không cần hỏi lại).
+10. **Quy tắc cập nhật APK:** Đối với ứng dụng Android (APK), mỗi lần cập nhật, AI PHẢI **review trước bản cập nhật cho user** (phiên bản mấy — `versionCode`, `versionName`; các nội dung sẽ ghi trong bản cập nhật / changelog hiển thị ở cửa sổ cập nhật in-app) để user duyệt trước khi tiến hành cập nhật/phát hành.
 
 ---
 
@@ -101,6 +102,14 @@ Theo `AGENTS.md` (trích ý):
 - Publish **cả frontend build** đi kèm backend (upload backend-only không hoàn thành UI change).
 - Backend cần restart: hướng dẫn user bấm **Web > Sites > Restart** trên alwaysdata (user tự làm bước này).
 - Sau deploy phải verify site công khai. Không báo "deploy xong" nếu backend vẫn chờ restart.
+
+### 7.1 Quy trình cập nhật ứng dụng Android (APK)
+- **Review trước bản cập nhật (bắt buộc):** Trước khi đóng gói APK hoặc cập nhật `/api/app/version`, AI phải trình bày trước cho user:
+  1. Số phiên bản mới: `versionCode` và `versionName`.
+  2. Nội dung chi tiết của bản cập nhật (`changelog` sẽ hiển thị trong modal In-App Update trên điện thoại).
+  3. Chờ user duyệt nội dung trước khi build và phát hành.
+- **Biên dịch APK:** Sử dụng JDK 23 (`JAVA_HOME="C:\Program Files\Java\jdk-23"`), Android SDK và chạy `gradlew.bat assembleDebug` trong `client/android/`.
+- **Phát hành APK:** Xuất file ra `YTM-Together.apk` tại thư mục gốc dự án, commit và push lên GitHub để link raw download hoạt động. Đồng thời cập nhật `server/src/routes/appVersion.js`.
 
 ## 8. Output format (cuối mỗi task code)
 
