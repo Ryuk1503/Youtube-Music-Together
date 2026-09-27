@@ -102,12 +102,14 @@ Cookie session: `__Host-ytm_session` (production) / `ytm_session` (dev) — Http
 | `client/src/roomConnection.js` | `subscribeToRoom` — join khi (re)connect, chống stale reply, timeout 15s, cleanup `room:leave` |
 | `client/src/pages/RoomPage.jsx` | **Trung tâm client (≈655 dòng)**: state room/members/messages/queue/playback/autoplay/restricted; join qua `subscribeToRoom`; toàn bộ socket listeners; host emit `player:clock`/`player:ended`/`player:errorSkip`; MediaSession API; visibilitychange → rejoin; minimized bottom bar; summary qua `sessionStorage['room-summary:${roomId}']` |
 
-⚠️ **Room state hoàn toàn in-memory:** restart process mất phòng (phòng trống được giữ 10 phút để guest quay lại); không thể scale nhiều process.
+⚠️ **Room state ở RAM, có snapshot qua `roomPersistence.js` để khôi phục sau restart.** Phòng trống được giữ 10 phút; vẫn giả định một process. Khi host mất kết nối tạm thời, `reserveHost` giữ quyền theo tài khoản trong 30 giây để nhận socket mới; sau thời hạn mới chuyển cho thành viên còn lại. Rời phòng chủ động chuyển quyền ngay. Sau restart, thành viên quay lại đầu tiên không lấy quyền của host đang trong thời gian chờ reconnect.
 
 ### 3.2 Đồng bộ playback (flow phức tạp nhất)
 
 - **Server là truth:** `room.currentTime` + `room.lastSyncedAt`; `getPlaybackState()` ngoại suy theo wall-clock khi `isPlaying`.
 - **Host client** emit `player:clock` (kèm `duration` → `room.audioClock`) định kỳ + khi play/resume/seek; server `updatePlaybackState`.
+- **Đồng bộ tiến độ:** host gửi vị trí media mỗi 2 giây khi phòng muốn phát; server xác thực host và video rồi chuyển `player:clock` cho các máy khác. Guest chỉ hiệu chỉnh khi cùng bài, đang muốn phát và lệch quá 3 giây. Thao tác trở lại tab/reconnect vẫn giữ vị trí nếu cùng nguồn đang phát khỏe; âm lượng do `volumeRef` trong `useYouTubePlayer` giữ, không lấy lại giá trị cũ từ callback socket.
+- **Log chuyển bài:** `[player:advance]` phân biệt `player:next`, `player:ended`, `player:errorSkip`, kèm videoId, vị trí/thời lượng và mã lỗi khi client cung cấp. Không dùng lịch sử số giây nghe để khẳng định chính xác nguyên nhân skip nếu thiếu log sự kiện.
 - **Guest** nhận `player:play` / `player:pause` / `player:seek` + snapshot state khi join. RoomPage bảo toàn position khi cùng source khỏe đang play (chi tiết: mục "Preserve playback on returning to the page" trong `NATIVE_AUDIO.md`).
 - **Phân quyền:** ai cũng `player:play`/`player:pause`; **host-only:** `player:seek`, `player:next`/`player:ended`/`player:errorSkip`, `player:toggleAutoplay`, `room:end`, `member:kick`/`member:restrict`/`member:transferHost`.
 - **Dual-mount navigation:** `client/src/App.jsx` — `ListeningRoutes` giữ RoomPage mounted (minimized bottom bar) khi route trang chủ hiển thị; `<audio>` element persistent gắn vào `document.body` (tạo trong `useAudioPlayer`) nên nhạc không bị cắt khi chuyển route.
@@ -264,6 +266,8 @@ Chi tiết schema + quyết định: **`MUSIC_HISTORY.md`**.
 
 - `client/android/app/src/main/java/com/ytmtogether/app/MusicControlsPlugin.java`: cầu nối Capacitor `MusicControls`, đăng ký trong `MainActivity`; `update` gửi tên bài, tác giả, trạng thái, vị trí/thời lượng và quyền chủ phòng sang `MusicService`; `stop` dừng service; event `control` trả thao tác Android về web.
 - `MusicService.java`: tạo Android `MediaSession`, `PlaybackState` và thông báo `Notification.MediaStyle` gắn session token. Phát/tạm dừng cho mọi thành viên; chuyển bài/tua chỉ cho chủ phòng. Service bắt đầu khi có bài trong phòng, dừng khi rời/kết thúc phòng hoặc bridge bị hủy; không tự khởi động lại với trạng thái phát giả khi process bị đóng.
+- `MainActivity.PlaybackWebView`: thay WebView trước khi tạo Capacitor bridge; giữ trạng thái window-visible của Chromium trong lúc phiên nghe còn hoạt động để iframe không bị ẩn chỉ vì Activity xuống nền. Plugin bật chế độ này khi cập nhật media, tắt khi dừng phiên; ngoài phiên nghe, WebView nhận lại visibility thật. Đây là phần sửa native, cần APK mới.
+- `useYouTubePlayer.isActuallyPlaying` cung cấp trạng thái player thật cho `RoomPage`; payload native tách ý định phát (`playing`) khỏi `buffering`. `MusicService` chuyển sang BUFFERING với tốc độ 0 khi player báo chờ, vị trí không tiến thêm trong 3 giây, hoặc quá 3,5 giây không nhận cập nhật. Không để thanh media tự chạy vô hạn dựa vào một trạng thái PLAYING cũ; watchdog được dọn khi dừng service.
 - `client/src/pages/RoomPage.jsx`: gửi trạng thái khi thay đổi và cập nhật vị trí mỗi giây; nhận `control` và gọi cùng handlers/socket events với nút trong phòng. Web và APK cũ chưa có plugin vẫn dùng Web Media Session; APK có plugin dùng điều khiển native.
 - Âm thanh vẫn do YouTube IFrame phát trong WebView; MediaSession là lớp điều khiển hệ thống, không phải quay lại pipeline yt-dlp/HTML audio trong tài liệu `NATIVE_AUDIO.md` cũ. Cần kiểm thử thanh thông báo, màn hình khóa và phát nền trên thiết bị thật khi phát hành APK.
 

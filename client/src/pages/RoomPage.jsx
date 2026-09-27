@@ -141,8 +141,21 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
     pendingSeekRef.current = 0;
     setDuration(0);
     yt.loadVideo(currentSong.videoId, startAt, desiredPlayingRef.current);
-    yt.setVolume(volume);
   }, [currentSong?.videoId, yt.ready]);
+
+  useEffect(() => { yt.setVolume(volume); }, [volume, yt.setVolume]);
+
+  useEffect(() => {
+    if (!socket || !isHost || !yt.ready || !currentSong || summary) return;
+    const sync = () => {
+      if (socket.connected && desiredPlayingRef.current) socket.emit('player:clock', {
+        videoId: currentSong.videoId, currentTime: yt.getCurrentTime(), duration: yt.getDuration(),
+      });
+    };
+    sync();
+    const timer = setInterval(sync, 2000);
+    return () => clearInterval(timer);
+  }, [socket, isHost, yt.ready, currentSong?.videoId, summary, yt.getCurrentTime, yt.getDuration]);
 
   // Track the native player position for the page and system media controls
   useEffect(() => {
@@ -177,10 +190,14 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
     };
     yt.onEndedRef.current = () => {
       setIsPlaying(false);
-      if (isHost && socket) socket.emit('player:ended', { videoId: currentSong?.videoId });
+      if (isHost && socket) socket.emit('player:ended', {
+        videoId: currentSong?.videoId, currentTime: yt.getCurrentTime(), duration: yt.getDuration(),
+      });
     };
     yt.onErrorRef.current = (errorCode) => {
-      if (isHost && socket) socket.emit('player:errorSkip', { videoId: currentSong?.videoId });
+      if (isHost && socket) socket.emit('player:errorSkip', {
+        videoId: currentSong?.videoId, currentTime: yt.getCurrentTime(), duration: yt.getDuration(), errorCode,
+      });
     };
   }, [currentSong?.videoId, isHost, socket, yt.onPlayingRef, yt.onPausedRef, yt.onEndedRef, yt.onErrorRef, yt]);
 
@@ -222,6 +239,15 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
       yt.seekTo(ct);
     };
 
+    const onPlayerClock = ({ videoId, currentTime: ct }) => {
+      if (isHost || videoId !== currentSong?.videoId || !desiredPlayingRef.current ||
+          !Number.isFinite(ct) || yt.getCurrentTime() <= 0) return;
+      if (Math.abs(yt.getCurrentTime() - ct) > 3) {
+        yt.seekTo(ct);
+        setCurrentTime(ct);
+      }
+    };
+
     const onSongChanged = ({ playbackState }) => {
       receiveListeningTime(playbackState.listeningTime);
       setQueue(playbackState.queue);
@@ -236,7 +262,6 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
       pendingSeekRef.current = playbackState.currentTime || 0;
       if (playbackState.currentSong) {
         yt.loadVideo(playbackState.currentSong.videoId, playbackState.currentTime || 0, playbackState.isPlaying, { preservePosition: true });
-        yt.setVolume(volume);
       }
     };
 
@@ -306,6 +331,7 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
     socket.on('player:play', onPlayerPlay);
     socket.on('player:pause', onPlayerPause);
     socket.on('player:seek', onPlayerSeek);
+    socket.on('player:clock', onPlayerClock);
     socket.on('player:songChanged', onSongChanged);
     socket.on('queue:updated', onQueueUpdated);
     socket.on('chat:message', onChatMessage);
@@ -326,6 +352,7 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
       socket.off('player:play', onPlayerPlay);
       socket.off('player:pause', onPlayerPause);
       socket.off('player:seek', onPlayerSeek);
+      socket.off('player:clock', onPlayerClock);
       socket.off('player:songChanged', onSongChanged);
       socket.off('queue:updated', onQueueUpdated);
       socket.off('chat:message', onChatMessage);
@@ -334,7 +361,7 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
       socket.off('member:listUpdated', onMemberListUpdated);
       socket.off('room:kicked', onKicked);
     };
-  }, [socket, user, roomId, location.state?.password, navigate, onExit]);
+  }, [socket, user, roomId, location.state?.password, navigate, onExit, isHost, currentSong?.videoId]);
 
   // Playback controls — anyone can play/pause
   const handlePlay = useCallback(() => {
@@ -401,7 +428,8 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
     const update = () => MusicControls.update({
       title: currentSong.title,
       artist: currentSong.author || '',
-      playing: isPlaying,
+      playing: desiredPlayingRef.current,
+      buffering: desiredPlayingRef.current && !yt.isActuallyPlaying(),
       canNavigate: isHost,
       position: yt.getCurrentTime(),
       duration: yt.getDuration(),
@@ -409,7 +437,7 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [currentSong, summary, isPlaying, isHost, yt.getCurrentTime, yt.getDuration]);
+  }, [currentSong, summary, isPlaying, isHost, yt.getCurrentTime, yt.getDuration, yt.isActuallyPlaying]);
 
   // System media controls call the same explicit actions as the page buttons.
   useEffect(() => {

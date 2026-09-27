@@ -11,6 +11,7 @@ export default function useYouTubePlayer() {
   const currentVideoIdRef = useRef(null);
   const desiredPlayingRef = useRef(false);
   const pendingLoadRef = useRef(null);
+  const volumeRef = useRef(0.7);
 
   const onEndedRef = useRef(null);
   const onPlayingRef = useRef(null);
@@ -77,6 +78,7 @@ export default function useYouTubePlayer() {
         events: {
           onReady: (event) => {
             if (destroyed) return;
+            setVolume(volumeRef.current);
             setReady(true);
             if (pendingLoadRef.current) {
               const { id, seconds, playing } = pendingLoadRef.current;
@@ -87,6 +89,7 @@ export default function useYouTubePlayer() {
           onStateChange: (event) => {
             if (destroyed) return;
             if (event.data === window.YT.PlayerState.PLAYING) {
+              setVolume(volumeRef.current);
               setError('');
               if ('mediaSession' in navigator) {
                 navigator.mediaSession.playbackState = 'playing';
@@ -222,6 +225,7 @@ export default function useYouTubePlayer() {
   }, []);
 
   const setVolume = useCallback((vol) => {
+    volumeRef.current = vol;
     const p = playerRef.current;
     if (!p) return;
     if (vol <= 0) {
@@ -240,6 +244,10 @@ export default function useYouTubePlayer() {
     return playerRef.current?.getDuration?.() || 0;
   }, []);
 
+  const isActuallyPlaying = useCallback(() => {
+    return !!playerRef.current && playerRef.current.getPlayerState?.() === window.YT?.PlayerState?.PLAYING;
+  }, []);
+
   return {
     ready,
     error,
@@ -251,6 +259,7 @@ export default function useYouTubePlayer() {
     setVolume,
     getCurrentTime,
     getDuration,
+    isActuallyPlaying,
     onEndedRef,
     onPlayingRef,
     onPausedRef,

@@ -14,6 +14,42 @@ function setupSocket(io, options) {
 
 const { deleteRoom } = require('../utils/roomManager');
 
+test('only host clocks synchronize listeners and reconnect keeps the same host', { timeout: 8000 }, async t => {
+ const server = http.createServer(); const io = new Server(server);
+ productionSetup(io, { originAllowed: () => true,
+   authenticateSession: async socket => ({id:socket.handshake.auth.user,username:socket.handshake.auth.user,token_hash:'test'}),
+   artistMetadata: async () => null, persistPlayback: async () => {} });
+ await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
+ const url = `http://127.0.0.1:${server.address().port}`;
+ const sockets = []; let roomId;
+ t.after(async () => { sockets.forEach(s=>s.disconnect());await new Promise(r=>io.close(r));if(roomId)deleteRoom(roomId); });
+ const client = async user => {
+   const s = connect(url,{transports:['websocket'],auth:{user},reconnection:false});sockets.push(s);
+   await new Promise((r,j)=>{s.once('connect',r);s.once('connect_error',j)});return s;
+ };
+ const host = await client('host'); const guest = await client('guest');
+ const ack = (s,event,data)=>s.timeout(2000).emitWithAck(event,data);
+ roomId=(await ack(host,'room:create',{name:'Clock'})).room.id;
+ await ack(guest,'room:join',{roomId});
+ await ack(host,'queue:add',{videoId:'aaaaaaaaaaa',title:'Song',duration:'4:29'});
+ host.emit('player:play',{currentTime:200});
+ await ack(host,'room:join',{roomId});
+ const clock = new Promise(r=>guest.once('player:clock',r));
+ host.emit('player:clock',{videoId:'aaaaaaaaaaa',currentTime:220,duration:269});
+ assert.deepEqual(await clock,{videoId:'aaaaaaaaaaa',currentTime:220});
+ guest.emit('player:clock',{videoId:'aaaaaaaaaaa',currentTime:10,duration:269});
+ const snapshot = await ack(guest,'room:join',{roomId});
+ assert.ok(snapshot.playbackState.currentTime>=220);
+ const left = new Promise(r=>guest.once('member:left',r));
+ host.disconnect();await left;
+ assert.equal((await ack(guest,'room:join',{roomId})).room.hostId,'host');
+ const returned = await client('host');
+ assert.equal((await ack(returned,'room:join',{roomId})).room.hostId,'host');
+ const nextClock = new Promise(r=>guest.once('player:clock',r));
+ returned.emit('player:clock',{videoId:'aaaaaaaaaaa',currentTime:230,duration:269});
+ assert.equal((await nextClock).currentTime,230);
+});
+
 test('server timer queues and prefetches a recommendation at the host ten-second mark', { timeout: 8000 }, async t => {
  process.env.JWT_SECRET = 'test-only';
  const server = http.createServer(); const io = new Server(server);

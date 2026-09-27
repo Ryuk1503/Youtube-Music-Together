@@ -4,6 +4,7 @@ const { getListeningTime } = require('./listeningTime');
 // In-memory room storage
 const rooms = new Map();
 const EMPTY_ROOM_TTL = 10 * 60 * 1000;
+const HOST_RECONNECT_GRACE = 30000;
 let changeObserver = null;
 
 // Lets roomPersistence snapshot the in-memory state, which is the only copy of
@@ -76,7 +77,11 @@ function joinRoom(roomId, socketId, user) {
   }
   room.members.set(socketId, { userId: user.userId, username: user.username });
   room.participants.set(String(user.userId), user.username);
-  if (wasEmpty) {
+  if (String(room.hostId) === String(user.userId) && !room.members.has(room.hostSocketId)) {
+    clearTimeout(room.hostReconnectTimer);
+    room.hostReconnectUntil = 0;
+    room.hostSocketId = socketId;
+  } else if (wasEmpty && !room.hostReconnectUntil) {
     room.hostId = user.userId;
     room.hostSocketId = socketId;
   }
@@ -84,12 +89,44 @@ function joinRoom(roomId, socketId, user) {
   return room;
 }
 
-function leaveRoom(roomId, socketId) {
+function reserveHost(room) {
+  clearTimeout(room.hostReconnectTimer);
+  room.hostSocketId = null;
+  room.hostReconnectUntil = Date.now() + HOST_RECONNECT_GRACE;
+  room.hostReconnectTimer = setTimeout(() => {
+    room.hostReconnectTimer = null;
+    room.hostReconnectUntil = 0;
+    if (rooms.get(room.id) !== room || room.hostSocketId) return;
+    const [socketId, member] = room.members.entries().next().value || [];
+    room.hostId = member?.userId ?? null;
+    room.hostSocketId = socketId ?? null;
+    changed();
+    room.onHostChanged?.(room);
+  }, HOST_RECONNECT_GRACE);
+  room.hostReconnectTimer.unref?.();
+}
+
+function leaveRoom(roomId, socketId, { reconnecting = false } = {}) {
   const room = rooms.get(roomId);
   if (!room) return null;
 
   getListeningTime(room);
   room.members.delete(socketId);
+
+  if (room.hostSocketId === socketId) {
+    const sameAccount = [...room.members].find(([, member]) => String(member.userId) === String(room.hostId));
+    if (sameAccount) {
+      room.hostSocketId = sameAccount[0];
+    } else if (reconnecting) {
+      reserveHost(room);
+    } else {
+      clearTimeout(room.hostReconnectTimer);
+      room.hostReconnectUntil = 0;
+      const [nextSocketId, nextHost] = room.members.entries().next().value || [];
+      room.hostId = nextHost?.userId ?? null;
+      room.hostSocketId = nextSocketId ?? null;
+    }
+  }
 
   // Keep empty rooms briefly so a refresh or reconnect can recover the room.
   if (room.members.size === 0) {
@@ -102,13 +139,6 @@ function leaveRoom(roomId, socketId) {
     }, EMPTY_ROOM_TTL);
     changed();
     return { deleted: false, room };
-  }
-
-  // If host left, transfer to first member
-  if (room.hostSocketId === socketId) {
-    const [newHostSocketId, newHost] = room.members.entries().next().value;
-    room.hostId = newHost.userId;
-    room.hostSocketId = newHostSocketId;
   }
 
   changed();
@@ -128,6 +158,7 @@ function deleteRoom(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
   clearTimeout(room.emptyRoomTimer);
+  clearTimeout(room.hostReconnectTimer);
   rooms.delete(roomId);
   changed();
   room.onClosed?.(room, 'ended');
@@ -283,6 +314,8 @@ function unrestrictMember(room, targetUserId) {
 function transferHost(room, targetUserId) {
   for (const [socketId, member] of room.members) {
     if (String(member.userId) === String(targetUserId)) {
+      clearTimeout(room.hostReconnectTimer);
+      room.hostReconnectUntil = 0;
       room.hostId = member.userId;
       room.hostSocketId = socketId;
       changed();
@@ -402,6 +435,7 @@ function restoreRooms(entries) {
         typeof entry.name !== 'string' || rooms.has(entry.id)) continue;
     const room = restoreRoom(entry);
     rooms.set(room.id, room);
+    if (room.hostId != null) reserveHost(room);
     // Nobody is reconnected yet: the room expires like any other empty room.
     room.emptyRoomTimer = setTimeout(() => {
       if (room.members.size === 0 && rooms.get(room.id) === room) {

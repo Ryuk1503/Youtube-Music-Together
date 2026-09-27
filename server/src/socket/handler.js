@@ -135,6 +135,7 @@ function setupSocket(io, { recommend, persistSession = async () => {}, artistMet
 
       // Host auto-joins
       joinRoom(room.id, socket.id, { userId: socket.user.userId, username: socket.user.username });
+      room.onHostChanged = () => io.to(room.id).emit('room:hostChanged', { hostId: room.hostId });
       socket.join(room.id);
       room.onClosed = (closedRoom, reason) => {
         roomHistory.closed(closedRoom, reason).catch(error => console.error('Room history close failed:', error.message));
@@ -170,8 +171,11 @@ function setupSocket(io, { recommend, persistSession = async () => {}, artistMet
       const previousRoom = findRoomBySocket(socket.id);
       if (previousRoom && previousRoom !== room) handleLeaveRoom(socket, io);
 
+      const previousHostId = room.hostId;
+      room.onHostChanged = () => io.to(room.id).emit('room:hostChanged', { hostId: room.hostId });
       joinRoom(roomId, socket.id, { userId: socket.user.userId, username: socket.user.username });
       socket.join(roomId);
+      if (previousHostId !== room.hostId) room.onHostChanged();
 
       // Get current state for the new joiner
       const playbackState = getPlaybackState(room);
@@ -216,6 +220,7 @@ function setupSocket(io, { recommend, persistSession = async () => {}, artistMet
           !Number.isFinite(currentTime) || currentTime < 0 || currentTime > duration) return;
       room.audioClock = { song, duration };
       updatePlaybackState(room, { currentTime });
+      socket.to(room.id).emit('player:clock', { videoId, currentTime });
     });
     socket.on('room:end', async (callback) => {
       const room = findRoomBySocket(socket.id);
@@ -285,6 +290,12 @@ function setupSocket(io, { recommend, persistSession = async () => {}, artistMet
         if (!room || room.hostSocketId !== socket.id) return;
         const current = room.queue[room.currentIndex];
         if (!current || (payload.videoId && payload.videoId !== current.videoId)) return;
+        console.log('[player:advance]', JSON.stringify({
+          roomId: room.id, videoId: current.videoId, event,
+          currentTime: Number.isFinite(payload.currentTime) ? payload.currentTime : null,
+          duration: Number.isFinite(payload.duration) ? payload.duration : null,
+          errorCode: Number.isInteger(payload.errorCode) ? payload.errorCode : null,
+        }));
         advance(room, event === 'player:errorSkip');
       });
     }
@@ -499,19 +510,20 @@ function setupSocket(io, { recommend, persistSession = async () => {}, artistMet
 
     // --- DISCONNECT ---
 
-    socket.on('disconnect', () => {
-      handleLeaveRoom(socket, io);
+    socket.on('disconnect', (reason) => {
+      handleLeaveRoom(socket, io, { reconnecting: reason !== 'server namespace disconnect' });
       console.log(`🔌 Disconnected: ${socket.user.username}`);
     });
   });
 }
 
-function handleLeaveRoom(socket, io) {
+function handleLeaveRoom(socket, io, options) {
   const room = findRoomBySocket(socket.id);
   if (!room) return;
 
   const roomId = room.id;
-  const result = leaveRoom(roomId, socket.id);
+  const previousHostId = room.hostId;
+  const result = leaveRoom(roomId, socket.id, options);
   if (!room.members.size) cancelAutoplay(room);
 
   socket.leave(roomId);
@@ -523,7 +535,7 @@ function handleLeaveRoom(socket, io) {
     });
 
     // If host changed, notify
-    if (result.room.hostSocketId !== socket.id) {
+    if (result.room.hostId !== previousHostId) {
       io.to(roomId).emit('room:hostChanged', {
         hostId: result.room.hostId,
       });

@@ -12,6 +12,9 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
@@ -26,6 +29,15 @@ public class MusicService extends Service {
     private String artist = "";
     private boolean playing;
     private boolean canNavigate;
+    private long position = -1;
+    private long lastProgressAt;
+    private final Handler progressHandler = new Handler(Looper.getMainLooper());
+    private final Runnable staleProgress = () -> {
+        if (playing && mediaSession != null) {
+            publishPlaybackState(true);
+            getSystemService(NotificationManager.class).notify(1001, createNotification());
+        }
+    };
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
 
@@ -57,16 +69,19 @@ public class MusicService extends Service {
         artist = intent.getStringExtra("artist");
         playing = intent.getBooleanExtra("playing", false);
         canNavigate = intent.getBooleanExtra("canNavigate", false);
-        long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE;
-        if (canNavigate) actions |= PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SEEK_TO;
+        long now = SystemClock.elapsedRealtime();
+        long nextPosition = intent.getLongExtra("position", 0);
+        if (position != nextPosition || !playing) lastProgressAt = now;
+        position = nextPosition;
+        boolean buffering = intent.getBooleanExtra("buffering", false) || now - lastProgressAt >= 3000;
         mediaSession.setMetadata(new MediaMetadata.Builder()
             .putString(MediaMetadata.METADATA_KEY_TITLE, title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, artist)
             .putLong(MediaMetadata.METADATA_KEY_DURATION, intent.getLongExtra("duration", 0))
             .build());
-        mediaSession.setPlaybackState(new PlaybackState.Builder().setActions(actions)
-            .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED,
-                intent.getLongExtra("position", 0), playing ? 1f : 0f).build());
+        publishPlaybackState(buffering);
+        progressHandler.removeCallbacks(staleProgress);
+        if (playing) progressHandler.postDelayed(staleProgress, 3500);
         mediaSession.setActive(true);
         acquireLocks();
         Notification notification = createNotification();
@@ -77,6 +92,15 @@ public class MusicService extends Service {
         }
 
         return START_NOT_STICKY;
+    }
+
+    private void publishPlaybackState(boolean buffering) {
+        long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE;
+        if (canNavigate) actions |= PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SEEK_TO;
+        int state = !playing ? PlaybackState.STATE_PAUSED
+            : buffering ? PlaybackState.STATE_BUFFERING : PlaybackState.STATE_PLAYING;
+        mediaSession.setPlaybackState(new PlaybackState.Builder().setActions(actions)
+            .setState(state, position, state == PlaybackState.STATE_PLAYING ? 1f : 0f).build());
     }
 
     private void dispatchControl(String action, long position) {
@@ -170,6 +194,7 @@ public class MusicService extends Service {
 
     @Override
     public void onDestroy() {
+        progressHandler.removeCallbacks(staleProgress);
         releaseLocks();
         mediaSession.setActive(false);
         mediaSession.release();

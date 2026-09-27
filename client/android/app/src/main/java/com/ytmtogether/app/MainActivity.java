@@ -11,12 +11,55 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.view.ViewGroup;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.CapacitorWebView;
 
 public class MainActivity extends BridgeActivity {
     private static final int PERMISSION_REQ_NOTIFICATIONS = 1001;
+    private PlaybackWebView playbackWebView;
+
+    @Override
+    protected void load() {
+        // Install before Capacitor creates its bridge so its clients/plugins use this WebView.
+        WebView original = findViewById(com.getcapacitor.android.R.id.webview);
+        ViewGroup parent = (ViewGroup) original.getParent();
+        int index = parent.indexOfChild(original);
+        playbackWebView = new PlaybackWebView(this);
+        playbackWebView.setId(original.getId());
+        ViewGroup.LayoutParams layout = original.getLayoutParams();
+        parent.removeView(original);
+        parent.addView(playbackWebView, index, layout);
+        original.destroy();
+        super.load();
+    }
+
+    void setBackgroundPlayback(boolean enabled) {
+        if (playbackWebView != null) playbackWebView.setBackgroundPlayback(enabled);
+    }
+
+    private static class PlaybackWebView extends CapacitorWebView {
+        private boolean backgroundPlayback;
+        private int actualWindowVisibility = VISIBLE;
+
+        PlaybackWebView(Context context) { super(context, null); }
+
+        void setBackgroundPlayback(boolean enabled) {
+            if (backgroundPlayback == enabled) return;
+            backgroundPlayback = enabled;
+            super.onWindowVisibilityChanged(enabled ? VISIBLE : actualWindowVisibility);
+            if (enabled) { onResume(); resumeTimers(); }
+        }
+
+        @Override
+        protected void onWindowVisibilityChanged(int visibility) {
+            actualWindowVisibility = visibility;
+            // Resuming timers alone does not prevent Chromium from hiding the player iframe.
+            super.onWindowVisibilityChanged(backgroundPlayback ? VISIBLE : visibility);
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -76,7 +119,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void keepWebViewAlive() {
-        if (this.bridge != null && this.bridge.getWebView() != null) {
+        if (playbackWebView != null && playbackWebView.backgroundPlayback && this.bridge != null) {
             WebView wv = this.bridge.getWebView();
             wv.onResume();
             wv.resumeTimers();

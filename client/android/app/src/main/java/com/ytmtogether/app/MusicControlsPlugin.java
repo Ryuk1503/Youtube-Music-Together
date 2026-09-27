@@ -29,11 +29,13 @@ public class MusicControlsPlugin extends Plugin {
         intent.putExtra("title", call.getString("title", "YouTube Music Together"));
         intent.putExtra("artist", call.getString("artist", ""));
         intent.putExtra("playing", call.getBoolean("playing", false));
+        intent.putExtra("buffering", call.getBoolean("buffering", false));
         intent.putExtra("canNavigate", call.getBoolean("canNavigate", false));
         intent.putExtra("position", Math.max(0L, (long) (call.getDouble("position", 0.0) * 1000)));
         intent.putExtra("duration", Math.max(0L, (long) (call.getDouble("duration", 0.0) * 1000)));
         try {
             ContextCompat.startForegroundService(getContext(), intent);
+            setBackgroundPlayback(true);
             call.resolve();
         } catch (Exception error) {
             call.reject("Không thể hiển thị điều khiển nhạc", error);
@@ -42,6 +44,7 @@ public class MusicControlsPlugin extends Plugin {
 
     @PluginMethod
     public void stop(PluginCall call) {
+        setBackgroundPlayback(false);
         getContext().stopService(new Intent(getContext(), MusicService.class));
         call.resolve();
     }
@@ -49,8 +52,16 @@ public class MusicControlsPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         if (MusicService.controlListener == listener) {
+            setBackgroundPlayback(false);
             MusicService.controlListener = null;
             getContext().stopService(new Intent(getContext(), MusicService.class));
+        }
+    }
+
+    private void setBackgroundPlayback(boolean enabled) {
+        if (getActivity() instanceof MainActivity) {
+            MainActivity activity = (MainActivity) getActivity();
+            activity.runOnUiThread(() -> activity.setBackgroundPlayback(enabled));
         }
     }
 }

@@ -77,10 +77,12 @@ test('a snapshot brings the room back with its queue, clock and members list', (
   assert.equal(restored.restricted.has('u-guest'), true);
   assert.equal(restored.messages[0].text, 'còn nghe được không');
 
-  // The first member back takes over the empty room.
+  // A guest reconnecting first must not take the saved host's place.
   const joined = joinRoom(restored.id, 's9', { userId: 'u-guest', username: 'Guest' });
   assert.equal(joined, restored);
-  assert.equal(restored.hostId, 'u-guest');
+  assert.equal(restored.hostId, 'u-host');
+  joinRoom(restored.id, 's10', { userId: 'u-host', username: 'Host' });
+  assert.equal(restored.hostSocketId, 's10');
   deleteRoom(restored.id);
   assert.equal(getRoom(room.id), null);
 });
@@ -134,4 +136,52 @@ test('snapshots carry the session summary data across a restart', t => {
   assert.deepEqual(restored.recentVideoIds, ['aaaaaaaaaaa']);
   assert.deepEqual([...restored.sessionArtists], ['b']);
   assert.equal(restored.listenedMs, 0);
+});
+
+test('host reconnects with a new socket without transferring ownership', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const room = createRoom({ name: 'Reconnect', host });
+  t.after(() => deleteRoom(room.id));
+  joinRoom(room.id, 's1', host);
+  joinRoom(room.id, 'guest', { userId: 'guest', username: 'Guest' });
+  leaveRoom(room.id, 's1', { reconnecting: true });
+  assert.equal(room.members.has('s1'), false);
+  assert.equal(room.hostId, host.userId);
+  assert.equal(room.hostSocketId, null);
+  t.mock.timers.tick(2000);
+  joinRoom(room.id, 'new-host', host);
+  t.mock.timers.tick(30000);
+  assert.equal(room.hostId, host.userId);
+  assert.equal(room.hostSocketId, 'new-host');
+});
+
+test('host transfers once after reconnect grace, but explicit leave transfers immediately', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const room = createRoom({ name: 'Grace', host });
+  t.after(() => deleteRoom(room.id));
+  joinRoom(room.id, 's1', host);
+  joinRoom(room.id, 'guest', { userId: 'guest', username: 'Guest' });
+  const notices = [];
+  room.onHostChanged = room => notices.push(room.hostId);
+  leaveRoom(room.id, 's1', { reconnecting: true });
+  t.mock.timers.tick(29999);
+  assert.equal(room.hostId, host.userId);
+  t.mock.timers.tick(1);
+  assert.equal(room.hostId, 'guest');
+  assert.deepEqual(notices, ['guest']);
+  joinRoom(room.id, 'new-host', host);
+  assert.equal(room.hostId, 'guest', 'late return does not steal host back');
+  leaveRoom(room.id, 'guest');
+  assert.equal(room.hostId, host.userId);
+});
+
+test('closing one host tab keeps another connected tab of the same account as host', t => {
+  const room = createRoom({ name: 'Tabs', host });
+  t.after(() => deleteRoom(room.id));
+  joinRoom(room.id, 's1', host);
+  joinRoom(room.id, 'guest', { userId: 'guest', username: 'Guest' });
+  joinRoom(room.id, 'host-tab2', host);
+  leaveRoom(room.id, 's1', { reconnecting: true });
+  assert.equal(room.hostId, host.userId);
+  assert.equal(room.hostSocketId, 'host-tab2');
 });

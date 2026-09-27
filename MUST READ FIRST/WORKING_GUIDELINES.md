@@ -86,6 +86,7 @@ Nếu thay đổi chạm tới bất kỳ điều nào dưới đây, mô tả t
 
 - KHÔNG auto chạy full test suite / full build / full project scan cho thay đổi cục bộ.
 - Với UI change: nếu không test được trong browser, nói rõ là chưa verify UI — không tuyên bố thành công.
+- Khi sửa lỗi web, kiểm tra cả ảnh hưởng trên APK, đặc biệt các hook/player và luồng Socket.IO dùng chung. Chọn kiểm thử vừa đủ theo lỗi; user tự thử Android thực tế, không mặc định chạy giả lập hay bộ kiểm thử Android nặng. Nếu APK dùng giao diện từ site và không đổi mã native, không đóng gói APK mới chỉ để cập nhật JavaScript.
 
 ## 6. Cập nhật tài liệu
 
