@@ -98,7 +98,11 @@ export default function AppUpdateChecker() {
 
         {updateInfo.changelog && (
           <div className="mb-5 rounded-xl border border-dark-600 bg-dark-900/60 p-3.5 text-xs text-dark-200 leading-relaxed whitespace-pre-wrap">
-            {updateInfo.changelog}
+            {updateInfo.changelog.split('\n').map((line, index) => (
+              <div key={index}>
+                {line.startsWith('- Sửa lỗi:') ? <>{'- '}<strong>Sửa lỗi:</strong>{line.slice('- Sửa lỗi:'.length)}</> : line}
+              </div>
+            ))}
           </div>
         )}
 

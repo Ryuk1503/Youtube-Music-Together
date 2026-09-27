@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppUpdatePlugin.class);
+        registerPlugin(MusicControlsPlugin.class);
         super.onCreate(savedInstanceState);
 
         // 1. Yêu cầu quyền thông báo trên Android 13+ (Bắt buộc để hiện thanh phát nhạc và giữ Foreground Service)
@@ -28,9 +29,6 @@ public class MainActivity extends BridgeActivity {
 
         // 2. Yêu cầu quyền Bỏ qua tối ưu hoá pin (Cực kỳ quan trọng với Xiaomi / MIUI để không đóng băng app khi tắt màn hình)
         requestBatteryOptimizationExemption();
-
-        // 3. Khởi chạy Foreground Service
-        startMusicForegroundService();
 
         // 4. Tùy biến WebView để phát nhạc mượt mà không cần tương tác từng bài
         setupWebView();
@@ -62,19 +60,6 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception e) {
             // Thiết bị không hỗ trợ intent này hoặc bị hạn chế bởi bảo mật của hãng (MIUI)
-            e.printStackTrace();
-        }
-    }
-
-    private void startMusicForegroundService() {
-        try {
-            Intent serviceIntent = new Intent(this, MusicService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
-        } catch (Exception e) {
             e.printStackTrace();
         }
     }

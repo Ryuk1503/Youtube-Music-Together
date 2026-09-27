@@ -260,6 +260,13 @@ Chi tiết schema + quyết định: **`MUSIC_HISTORY.md`**.
 | `client/src/components/AppUpdateChecker.jsx` | Tự động kiểm tra bản cập nhật khi chạy trên Native App (`Capacitor.isNativePlatform()`), hiển thị modal cập nhật và thanh tiến trình download |
 | `client/src/App.jsx` | Tích hợp lớp kiểm tra ở root component, bảo lưu 100% mã nguồn các trang và route hiện có |
 
+### 8.4 Điều khiển nhạc Android (MediaSession)
+
+- `client/android/app/src/main/java/com/ytmtogether/app/MusicControlsPlugin.java`: cầu nối Capacitor `MusicControls`, đăng ký trong `MainActivity`; `update` gửi tên bài, tác giả, trạng thái, vị trí/thời lượng và quyền chủ phòng sang `MusicService`; `stop` dừng service; event `control` trả thao tác Android về web.
+- `MusicService.java`: tạo Android `MediaSession`, `PlaybackState` và thông báo `Notification.MediaStyle` gắn session token. Phát/tạm dừng cho mọi thành viên; chuyển bài/tua chỉ cho chủ phòng. Service bắt đầu khi có bài trong phòng, dừng khi rời/kết thúc phòng hoặc bridge bị hủy; không tự khởi động lại với trạng thái phát giả khi process bị đóng.
+- `client/src/pages/RoomPage.jsx`: gửi trạng thái khi thay đổi và cập nhật vị trí mỗi giây; nhận `control` và gọi cùng handlers/socket events với nút trong phòng. Web và APK cũ chưa có plugin vẫn dùng Web Media Session; APK có plugin dùng điều khiển native.
+- Âm thanh vẫn do YouTube IFrame phát trong WebView; MediaSession là lớp điều khiển hệ thống, không phải quay lại pipeline yt-dlp/HTML audio trong tài liệu `NATIVE_AUDIO.md` cũ. Cần kiểm thử thanh thông báo, màn hình khóa và phát nền trên thiết bị thật khi phát hành APK.
+
 ---
 
 ## 9. Hạ tầng chung, DB & vận hành

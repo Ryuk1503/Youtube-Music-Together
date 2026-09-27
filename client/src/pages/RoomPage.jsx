@@ -12,6 +12,10 @@ import MemberList from '../components/MemberList';
 import ListeningTimer from '../components/ListeningTimer';
 import SessionSummary from '../components/SessionSummary';
 import { ArrowLeft, Crown, Users, Music, ListMusic, LogOut, Play, Pause } from 'lucide-react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+const MusicControls = registerPlugin('MusicControls');
+const hasNativeControls = () => Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('MusicControls');
 
 export default function RoomPage({ minimized = false, onExit } = {}) {
   const { roomId } = useParams();
@@ -58,6 +62,7 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
   const maxWindowHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 800);
   const pendingSeekRef = useRef(0); // for syncing playback position on join
   const desiredPlayingRef = useRef(false);
+  const nativeActionsRef = useRef({});
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -361,9 +366,54 @@ export default function RoomPage({ minimized = false, onExit } = {}) {
     socket.emit('player:next', { videoId: currentSong?.videoId });
   }, [isHost, socket, currentSong?.videoId]);
 
+  nativeActionsRef.current = currentSong && !summary ? {
+    play: handlePlay,
+    pause: handlePause,
+    nexttrack: isHost ? handleNext : null,
+    seekto: isHost ? ({ position }) => {
+      if (Number.isFinite(position)) handleSeek(position);
+    } : null,
+  } : {};
+
+  useEffect(() => {
+    if (!hasNativeControls()) return;
+    let disposed = false;
+    let listener;
+    MusicControls.addListener('control', event => {
+      if (!disposed) nativeActionsRef.current[event.action]?.(event);
+    }).then(handle => {
+      if (disposed) handle.remove();
+      else listener = handle;
+    }).catch(error => console.error('Native music controls listener:', error));
+    return () => {
+      disposed = true;
+      listener?.remove();
+      MusicControls.stop().catch(error => console.error('Native music controls stop:', error));
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasNativeControls()) return;
+    if (!currentSong || summary) {
+      MusicControls.stop().catch(error => console.error('Native music controls stop:', error));
+      return;
+    }
+    const update = () => MusicControls.update({
+      title: currentSong.title,
+      artist: currentSong.author || '',
+      playing: isPlaying,
+      canNavigate: isHost,
+      position: yt.getCurrentTime(),
+      duration: yt.getDuration(),
+    }).catch(error => console.error('Native music controls update:', error));
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [currentSong, summary, isPlaying, isHost, yt.getCurrentTime, yt.getDuration]);
+
   // System media controls call the same explicit actions as the page buttons.
   useEffect(() => {
-    if (!('mediaSession' in navigator)) return;
+    if (hasNativeControls() || !('mediaSession' in navigator)) return;
     const actions = {
       play: currentSong && !summary ? handlePlay : null,
       pause: currentSong && !summary ? handlePause : null,

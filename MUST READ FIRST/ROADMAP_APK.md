@@ -39,10 +39,12 @@ Tài liệu này theo dõi toàn bộ tiến trình đóng gói và phát triể
 - [x] **Bước 4: Biên dịch và đóng gói file APK (`app-debug.apk`) & In-App Update** `[🤖 AI]`
   - Thiết lập biến môi trường `JAVA_HOME` (JDK 23) và `ANDROID_HOME` (Android Sdk).
   - Tích hợp Native Plugin `AppUpdatePlugin.java` & `REQUEST_INSTALL_PACKAGES` để hỗ trợ tải và tự động mở trình cài đặt cập nhật ngay trong ứng dụng.
-  - Chạy Gradle Wrapper (`gradlew.bat assembleDebug`) trong `client/android/` (versionCode 2, versionName 1.0.1).
+  - Chạy Gradle Wrapper (`gradlew.bat assembleDebug`) trong `client/android/` (bản cập nhật 2026-09-27: versionCode 4, versionName 0.0.3).
   - Xuất file cài đặt `YTM-Together.apk` ra ngay thư mục gốc dự án. (Hoàn thành)
 
 - [ ] **Bước 5: Cài đặt và kiểm thử thực tế trên điện thoại** `[👤 USER]`
+  - Bản 0.0.3 đã qua build, Android lint, kiểm tra chữ ký khớp APK trước và cài trên giả lập Android. MediaSession/MediaStyle hiện trong bảng điều khiển hệ thống; callback tạm dừng/chuyển bài về JavaScript hoạt động; thành viên không có quyền chuyển bài. Modal cập nhật đã kiểm tra trên trình duyệt với API/native giả lập.
+  - Lượt thử phát YouTube khi tắt màn hình trên giả lập bị buffering nên **chưa xác nhận phát nền thực tế**; cần kiểm tra bằng bản APK trên điện thoại, không coi việc hiện media player là bằng chứng nghe nền thành công.
   - Tải file `.apk` vào điện thoại Android và tiến hành cài đặt.
   - Đăng nhập tài khoản, vào phòng nghe nhạc.
   - Kiểm tra xem nhạc có tiếp tục phát khi:

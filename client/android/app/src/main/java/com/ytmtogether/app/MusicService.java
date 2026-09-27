@@ -12,12 +12,20 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
-import androidx.core.app.NotificationCompat;
+import android.media.MediaMetadata;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 
 public class MusicService extends Service {
     public static final String CHANNEL_ID = "ytm_together_channel";
-    public static final String ACTION_START = "ACTION_START";
-    public static final String ACTION_STOP = "ACTION_STOP";
+    public static final String ACTION_UPDATE = "ACTION_UPDATE";
+    interface ControlListener { void onControl(String action, long position); }
+    static volatile ControlListener controlListener;
+    private MediaSession mediaSession;
+    private String title = "YouTube Music Together";
+    private String artist = "";
+    private boolean playing;
+    private boolean canNavigate;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
 
@@ -25,17 +33,41 @@ public class MusicService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        mediaSession = new MediaSession(this, "YTM Together");
+        mediaSession.setCallback(new MediaSession.Callback() {
+            @Override public void onPlay() { dispatchControl("play", 0); }
+            @Override public void onPause() { dispatchControl("pause", 0); }
+            @Override public void onSkipToNext() { dispatchControl("nexttrack", 0); }
+            @Override public void onSeekTo(long position) { dispatchControl("seekto", position); }
+        });
+        mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
-            releaseLocks();
-            stopForeground(true);
+        if (intent == null || controlListener == null) {
             stopSelf();
             return START_NOT_STICKY;
         }
-
+        if (!ACTION_UPDATE.equals(intent.getAction())) {
+            dispatchControl(intent.getAction(), 0);
+            return START_NOT_STICKY;
+        }
+        title = intent.getStringExtra("title");
+        artist = intent.getStringExtra("artist");
+        playing = intent.getBooleanExtra("playing", false);
+        canNavigate = intent.getBooleanExtra("canNavigate", false);
+        long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE;
+        if (canNavigate) actions |= PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SEEK_TO;
+        mediaSession.setMetadata(new MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, title)
+            .putString(MediaMetadata.METADATA_KEY_ARTIST, artist)
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, intent.getLongExtra("duration", 0))
+            .build());
+        mediaSession.setPlaybackState(new PlaybackState.Builder().setActions(actions)
+            .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED,
+                intent.getLongExtra("position", 0), playing ? 1f : 0f).build());
+        mediaSession.setActive(true);
         acquireLocks();
         Notification notification = createNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -44,7 +76,14 @@ public class MusicService extends Service {
             startForeground(1001, notification);
         }
 
-        return START_STICKY;
+        return START_NOT_STICKY;
+    }
+
+    private void dispatchControl(String action, long position) {
+        ControlListener listener = controlListener;
+        if (listener == null) return;
+        if (("nexttrack".equals(action) || "seekto".equals(action)) && !canNavigate) return;
+        listener.onControl(action, position);
     }
 
     private void acquireLocks() {
@@ -106,19 +145,35 @@ public class MusicService extends Service {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0
         );
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("YouTube Music Together")
-            .setContentText("Đang phát nhạc cùng phòng trong nền...")
+        mediaSession.setSessionActivity(pendingIntent);
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
+        builder.setContentTitle(title)
+            .setContentText(artist)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build();
+            .addAction(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                playing ? "Tạm dừng" : "Phát", controlIntent(playing ? "pause" : "play"));
+        if (canNavigate) builder.addAction(android.R.drawable.ic_media_next, "Bài tiếp theo", controlIntent("nexttrack"));
+        Notification.MediaStyle style = new Notification.MediaStyle().setMediaSession(mediaSession.getSessionToken());
+        style.setShowActionsInCompactView(canNavigate ? new int[]{0, 1} : new int[]{0});
+        return builder.setStyle(style).build();
+    }
+
+    private PendingIntent controlIntent(String action) {
+        return PendingIntent.getService(this, 0, new Intent(this, MusicService.class).setAction(action),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     @Override
     public void onDestroy() {
         releaseLocks();
+        mediaSession.setActive(false);
+        mediaSession.release();
+        stopForeground(true);
         super.onDestroy();
     }
 

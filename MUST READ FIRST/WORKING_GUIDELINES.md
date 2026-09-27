@@ -106,8 +106,11 @@ Theo `AGENTS.md` (trích ý):
 ### 7.1 Quy trình cập nhật ứng dụng Android (APK)
 - **Review trước bản cập nhật (bắt buộc):** Trước khi đóng gói APK hoặc cập nhật `/api/app/version`, AI phải trình bày trước cho user:
   1. Số phiên bản mới: `versionCode` và `versionName`.
-  2. Nội dung chi tiết của bản cập nhật (`changelog` sẽ hiển thị trong modal In-App Update trên điện thoại).
-  3. Chờ user duyệt nội dung trước khi build và phát hành.
+  2. Bản xem trước nguyên văn nội dung sẽ hiển thị trong modal In-App Update trên điện thoại: tiêu đề, dòng phiên bản, `changelog` và nhãn nút; thể hiện rõ xuống dòng và cách trình bày để user duyệt câu chữ, nội dung nhìn và thẩm mỹ. Không dùng danh sách kỹ thuật nội bộ thay cho nội dung dành cho người dùng.
+  3. Chờ user chốt nội dung hiển thị trước khi build và phát hành; nếu sửa nội dung đã duyệt thì trình lại phần thay đổi.
+  4. Đây là bước duyệt nội dung và thẩm mỹ cửa sổ cập nhật, không phải yêu cầu duyệt lại từng chi tiết triển khai kỹ thuật. Vẫn tiếp tục điều tra, sửa code trong phạm vi đã được cho phép và kiểm chứng không đóng gói APK trong lúc chờ duyệt.
+- **Cách viết nội dung cập nhật:** Có hai loại dòng, đều trình bày bằng gạch đầu dòng. Cập nhật tính năng/cải tiến viết nội dung trực tiếp. Sửa lỗi bắt đầu bằng nhãn **Sửa lỗi:** được in đậm, phần mô tả phía sau dùng chữ thường. Ví dụ: `- Bổ sung tìm kiếm bài hát.` và `- **Sửa lỗi:** Trình điều khiển nhạc không hiển thị khi phát nhạc.` Nhãn phải được render đậm trong cửa sổ cập nhật, không hiển thị nguyên dấu `**`. Viết ngắn, tự nhiên, tập trung vào thay đổi người dùng nhìn thấy; không khẳng định đã khắc phục hành vi chưa kiểm thử.
+- **Phiên bản trong giai đoạn phát triển:** Dùng `versionName` dạng `0.0.x`; bản đang chuẩn bị theo yêu cầu ngày 2026-09-27 là `0.0.3`. `versionCode` vẫn tăng so với APK đã phát hành để giữ luồng cập nhật Android. Dòng "hiện tại" trong cửa sổ cập nhật lấy phiên bản thực tế của APK đang cài, không ghi cứng theo bản xem trước.
 - **Biên dịch APK:** Sử dụng JDK 23 (`JAVA_HOME="C:\Program Files\Java\jdk-23"`), Android SDK và chạy `gradlew.bat assembleDebug` trong `client/android/`.
 - **Phát hành APK:** Xuất file ra `YTM-Together.apk` tại thư mục gốc dự án, commit và push lên GitHub để link raw download hoạt động. Đồng thời cập nhật `server/src/routes/appVersion.js`.
 
